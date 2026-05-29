@@ -1,0 +1,662 @@
+{
+  "tui": {
+    "boot": {
+      "connecting": "Connecting to AstrBot Dashboard...",
+      "loadingChats": "Loading chat sessions...",
+      "loadingCommands": "Loading commands and function tools...",
+      "loadingData": "Loading AstrBot Dashboard data...",
+      "loadingHistory": "Loading current chat history...",
+      "loadingPlatforms": "Loading platforms...",
+      "loadingPersonas": "Loading personas...",
+      "loadingPlugins": "Loading plugins...",
+      "loadingProviders": "Loading providers...",
+      "loadingStats": "Loading runtime statistics...",
+      "refreshed": "Refreshed."
+    },
+    "chat": {
+      "chats": "Chats",
+      "chatsFiltered": "Chats {shown}/{total}",
+      "createdSession": "Created a new WebChat session.",
+      "emptyHint": "Type below to start a conversation.",
+      "emptyTitle": "Start a conversation with AstrBot",
+      "history": "history +{count}",
+      "newChat": "New chat",
+      "newChatTitle": "New chat",
+      "noChats": "No chats yet.",
+      "noMatchingChats": "No matching chats.",
+      "pageUpHistory": "PageUp history",
+      "responseComplete": "Response complete.",
+      "streaming": "streaming",
+      "streamingResponse": "Streaming response...",
+      "title": "AstrBot Chat",
+      "workspace": "Chat workspace"
+    },
+    "cli": {
+      "description": "Terminal workbench for AstrBot Dashboard",
+      "labels": {
+        "server": "Server: {serverUrl}",
+        "tokenStore": "Token store: {kind}",
+        "user": "User: {username}",
+        "username": "Username: {username}"
+      },
+      "login": {
+        "description": "Log in to AstrBot Dashboard and store the JWT",
+        "failed": "Login failed: {error}",
+        "options": {
+          "passwordStdin": "Read the Dashboard password from stdin",
+          "username": "Dashboard username"
+        },
+        "success": "Logged in as {username}. Token stored with {kind}."
+      },
+      "logout": {
+        "description": "Remove the stored Dashboard JWT",
+        "failed": "Logout failed: {error}",
+        "success": "Logged out from {serverUrl}. Token removed from {kind}."
+      },
+      "options": {
+        "language": "TUI language: en-US or zh-CN",
+        "server": "AstrBot Dashboard URL"
+      },
+      "status": {
+        "description": "Check the stored session and Dashboard version"
+      }
+    },
+    "commands": {
+      "commandDisabled": "Command disabled.",
+      "commandEnabled": "Command enabled.",
+      "commandSummary": "{total} total, {disabled} disabled, {conflicts} conflicts",
+      "detail": {
+        "aliases": "aliases",
+        "params": "params"
+      },
+      "enterToggles": "Enter toggles",
+      "header": {
+        "command": "Command",
+        "origin": "Origin",
+        "plugin": "Plugin",
+        "source": "Source",
+        "stateShort": "S",
+        "tool": "Tool",
+        "type": "Type"
+      },
+      "help": {
+        "toggleCommand": "Enter toggles selected command.",
+        "toggleTool": "Enter toggles selected tool."
+      },
+      "leftRightSwitch": "Left/Right switch",
+      "loadingCommandStatus": "Loading command status.",
+      "loadingCommandsShort": "loading commands",
+      "loadingFunctionTools": "Loading function tools.",
+      "loadingToolsShort": "loading tools",
+      "origin": {
+        "builtin": "builtin",
+        "mcp": "mcp",
+        "plugin": "plugin"
+      },
+      "state": {
+        "conflict": "!"
+      },
+      "suffix": {
+        "conflict": "conflict",
+        "system": "system"
+      },
+      "title": "Commands",
+      "toolDisabled": "Tool disabled.",
+      "toolEnabled": "Tool enabled.",
+      "tools": "Tools",
+      "totalSummary": "{total} total, {disabled} disabled, {readonly} readonly",
+      "type": {
+        "commandShort": "cmd",
+        "group": "group",
+        "sub": "sub"
+      }
+    },
+    "common": {
+      "add": "Add",
+      "calls": "calls",
+      "close": "Close",
+      "dashboard": "dashboard",
+      "deleteShort": "X",
+      "edit": "Edit",
+      "false": "false",
+      "from": "from",
+      "install": "Install",
+      "installing": "installing",
+      "loading": "loading",
+      "login": "Login",
+      "name": "Name",
+      "new": "new",
+      "none": "N/A",
+      "off": "off",
+      "on": "on",
+      "readonly": "readonly",
+      "readonlyShort": "ro",
+      "remove": "Remove",
+      "saving": "saving",
+      "scroll": "scroll",
+      "search": "Search",
+      "settings": "Settings",
+      "stateShort": "S",
+      "status": "Status",
+      "time": {
+        "hourShort": "h",
+        "minuteShort": "m",
+        "secondShort": "s"
+      },
+      "tokens": "tokens",
+      "true": "true",
+      "unknown": "unknown",
+      "updated": "Updated {name}.",
+      "value": "value"
+    },
+    "console": {
+      "disconnected": "Live logs disconnected: {error}",
+      "history": "history +{count}",
+      "liveTail": "live tail",
+      "title": "Console",
+      "waitingForLogs": "Waiting for live logs."
+    },
+    "agents": {
+      "confirmDelete": "Press Enter again to delete persona {id}.",
+      "count": "{count}",
+      "emptySettings": "No editable persona settings.",
+      "footer": {
+        "cancel": "{id}  Enter cancels editing.",
+        "delete": "{id}  Enter twice deletes.",
+        "edit": "{id}  Enter edits. Right opens fields.",
+        "editing": "Editing {key}. Enter saves, Esc cancels.",
+        "fields": "Enter edits the selected persona setting. Left returns to list.",
+        "fieldSelected": "{key}  Enter edits. Left returns to list.",
+        "new": "Enter creates a draft persona.",
+        "readonly": "{key} is read-only.",
+        "save": "{id}  Enter saves changes."
+      },
+      "hints": {
+        "dialogs": "JSON array or lines split by |. Must contain user/assistant pairs.",
+        "selectionList": "Use * for all, empty for none, or comma-separated names."
+      },
+      "loadingDetail": "Loading persona {id}...",
+      "meta": "{count} personas  {position}",
+      "selectPersona": "Select a persona.",
+      "table": {
+        "skills": "Skills",
+        "tools": "Tools"
+      }
+    },
+    "keys": {
+      "enterApplyEscClose": "Enter apply  Esc close",
+      "enterContinueEscCancel": "Enter continue  Esc cancel",
+      "enterEsc": "Enter/Esc",
+      "enterSaveEscCancel": "Enter save  Esc cancel",
+      "enterSelectEscCancel": "Enter select  Esc cancel",
+      "escClose": "Esc close",
+      "tabSwitch": "Tab switch"
+    },
+    "nav": {
+      "chat": "Chat",
+      "commands": "Commands",
+      "console": "Console",
+      "platforms": "Platforms",
+      "plugins": "Plugins",
+      "providers": "Providers",
+      "status": "Status"
+    },
+    "platforms": {
+      "adapters": {
+        "title": "Adapters"
+      },
+      "alreadyLoggedIn": "{id} is already logged in.",
+      "confirmDelete": "Press Enter again to delete platform {id}.",
+      "createCanceled": "Create canceled.",
+      "created": "Created {template} adapter {id}. Edit settings on the right.",
+      "deleted": "Deleted platform {id}.",
+      "disabled": "Platform disabled.",
+      "editPlatformSetting": "Edit Platform Setting",
+      "editing": "Editing {key}. Enter saves, Esc cancels.",
+      "empty": {
+        "adapters": "No platform adapters.",
+        "selection": "Select a platform adapter.",
+        "settings": "No editable adapter settings."
+      },
+      "enabled": "Platform enabled.",
+      "footer": {
+        "delete": "{id}  Enter twice deletes.",
+        "editing": "Editing {key}. Enter saves, Esc cancels.",
+        "login": "{id}  Enter opens scan login.",
+        "new": "Enter opens adapter template selection.",
+        "runtime": "Runtime  Enter logs in when available. Down selects settings. Left returns to adapters.",
+        "selectAdapter": "Select an adapter.",
+        "settingSelected": "{key}  Enter edits. Up returns to runtime. Left returns to runtime.",
+        "settings": "Enter edits the selected adapter setting. Left returns to adapters.",
+        "switch": "{id}  Enter toggles on/off."
+      },
+      "idRequired": "Platform id is required.",
+      "invalidName": "Invalid platform name. It cannot be empty or contain ! or :.",
+      "loggedIn": "Logged in {id}.",
+      "loginCreated": "Login created. Updating adapter config...",
+      "meta": "{adapters} adapters  {templates} templates  {position}",
+      "noAdapterTemplates": "No platform adapter templates available.",
+      "noTemplateSelected": "No platform template selected.",
+      "noTemplates": "No templates available.",
+      "qrTooSmall": "QR {size}x{size}. Enlarge terminal or open: {url}",
+      "runtime": {
+        "errors": "Errors",
+        "info": {
+          "errors": "ERR {count}",
+          "qr": "QR",
+          "webhook": "Hook"
+        },
+        "lastError": "Last error",
+        "logged": "Logged",
+        "status": {
+          "error": "error",
+          "pending": "pending",
+          "running": "running"
+        },
+        "title": "Runtime",
+        "webhook": "Webhook"
+      },
+      "scanClosed": "Scan login closed.",
+      "scanStarting": "Starting scan registration...",
+      "scanLogin": "Scan Login {id}",
+      "scanStarted": "Scan login started for {id}.",
+      "scanUnsupported": "{id} does not support scan login.",
+      "scanWait": "Scan in the browser/app, then wait for created.",
+      "selectAdapterTemplate": "Select a platform adapter template.",
+      "selectPlatform": "Select Platform",
+      "settings": {
+        "platformName": "Platform Name",
+        "platformNameHint": "Unique adapter name."
+      },
+      "statusPending": "pending",
+      "table": {
+        "adapter": "Adapter",
+        "info": "Info",
+        "type": "Type"
+      },
+      "title": "Platforms",
+      "verificationCode": "Code {code}",
+      "waitingQr": "Waiting for QR or login link..."
+    },
+    "pluginConfig": {
+      "addEntry": "Add entry",
+      "addedFile": "Added {name}.",
+      "addKey": "Add key",
+      "allPlugins": "All plugins",
+      "allPluginsHint": "Use every available plugin",
+      "builtInDefaultPersona": "Built-in default persona",
+      "chunksCount": "{count} chunks",
+      "clearSelection": "Clear selection",
+      "configuredCount": "{count} configured",
+      "current": "Current  {value}",
+      "defaultPersona": "Default",
+      "deleteEntry": "Delete entry",
+      "deleteKey": "Delete key",
+      "deletedKey": "Deleted {name}.",
+      "docsCount": "{count} docs",
+      "editCanceled": "Edit canceled.",
+      "editPluginConfig": "Edit Plugin Config",
+      "editTemplateField": "Edit Template Field",
+      "editing": "Editing {name}. Enter saves, Esc cancels.",
+      "editingField": "Editing {name}. Enter saves field, Esc returns.",
+      "entry": "Entry  {index}",
+      "entryLabel": "Entry {index}",
+      "escToClose": "Esc to close",
+      "field": "Field  {name}",
+      "fieldEditCanceled": "Field edit canceled.",
+      "fileManagerClosed": "File manager closed.",
+      "filesTitle": "Files {name}",
+      "hint": "Hint",
+      "isConfigGroup": "{name} is a config group.",
+      "keyRequired": "Key is required.",
+      "keys": {
+        "choiceMulti": "Enter toggle  Save row applies  Esc cancel",
+        "entries": "Enter open  Right open  Esc close",
+        "fields": "Enter edit  Delete row removes  Left back",
+        "object": "Enter edit/add  Left/Right type  Esc close",
+        "objectEdit": "Tab key/value  Enter save  Esc back",
+        "templates": "Enter add  Left back  Esc close"
+      },
+      "loadingChoices": "Loading choices...",
+      "loadingFiles": "Loading files...",
+      "missing": "missing",
+      "noChoices": "No choices.",
+      "noChoicesLoaded": "No choices loaded",
+      "noEntries": "No entries. Select Add entry.",
+      "noFiles": "No files.",
+      "noFilesFound": "No files found",
+      "noPlugins": "No plugins",
+      "noPluginsHint": "Disable plugin tools for this scope",
+      "noTemplatesInSchema": "No templates in schema.",
+      "objectTitle": "Object {name}",
+      "objectEditorClosed": "Object editor closed.",
+      "options": "Options",
+      "optionsTitle": "{name} Options",
+      "removedFile": "Removed {name}.",
+      "saveSelection": "Save selection",
+      "selectKnowledgeBase": "Select Knowledge Base",
+      "selectPersona": "Select Persona",
+      "selectPluginSet": "Select Plugin Set",
+      "selectProvider": "Select Provider",
+      "selectValue": "Select Value",
+      "selectedCount": "{count} selected",
+      "templateCount": "{count} templates",
+      "templateList": "Template List {name}",
+      "templateListClosed": "Template list closed.",
+      "unknownTemplate": "unknown template",
+      "uploadNotWired": "Upload is not wired yet"
+    },
+    "plugins": {
+      "action": {
+        "delete": "X",
+        "onOff": "on/off",
+        "reload": "reload",
+        "update": "update"
+      },
+      "actions": "Actions",
+      "astrbot": "AstrBot",
+      "author": "Author",
+      "category": "Category",
+      "componentType": {
+        "command": "command",
+        "component": "component",
+        "page": "page",
+        "skill": "skill",
+        "tool": "tool"
+      },
+      "components": "Components",
+      "config": "Config",
+      "configType": {
+        "bool": "bool",
+        "boolean": "bool",
+        "dict": "dict",
+        "file": "file",
+        "float": "float",
+        "int": "int",
+        "list": "list",
+        "number": "num",
+        "object": "object",
+        "special": "special",
+        "string": "str",
+        "templateList": "tmpl",
+        "value": "value"
+      },
+      "configValue": {
+        "empty": "empty",
+        "entries": "entries",
+        "fields": "fields",
+        "files": "files",
+        "keys": "keys",
+        "section": "section"
+      },
+      "confirmMarketAction": "Press Enter again to {action} {name}.",
+      "confirmUninstall": "Press Enter again to uninstall plugin {name}.",
+      "continueWarning": "Continue ignoring this warning?",
+      "current": "current",
+      "detail": "Detail",
+      "disabled": "Plugin disabled.",
+      "enabled": "Plugin enabled.",
+      "featured": "Featured",
+      "filter": "filter",
+      "headerAction": "Action",
+      "headerDelete": "X",
+      "headerPlugin": "Plugin",
+      "headerState": "S",
+      "help": {
+        "components": "Down opens config, Left returns to list.",
+        "marketEmpty": "Search filters the market. Enter opens the search box.",
+        "marketSearch": "Enter opens search. Left returns to tabs. Down opens results.",
+        "tabs": "Left/Right moves across the top row. Down or Enter opens the selected tab."
+      },
+      "installCanceled": "Install canceled.",
+      "installWarning": "Install warning for {name}. Confirm to continue.",
+      "installWarningFallback": "Install warning.",
+      "installWarningTitle": "Install Warning",
+      "installed": "Installed",
+      "installedOk": "Installed plugin {name}.",
+      "installing": "Installing plugin {name}...",
+      "installingIgnoringWarning": "Installing plugin {name} ignoring version warning...",
+      "latest": "Latest",
+      "loadedConfig": "Loaded plugin {name} config.",
+      "loadedDetail": "Loaded plugin {name}.",
+      "loadingComponents": "Loading plugin components...",
+      "loadingConfig": "Loading plugin {name} config...",
+      "loadingConfigPlain": "Loading plugin config...",
+      "loadingDetail": "Loading plugin {name} details...",
+      "market": "Market",
+      "marketMatched": "{shown}/{total} matched",
+      "marketSearchHint": "Type plugin name, author, category, tag, or repo.",
+      "marketSearchHintShort": "Type to filter.",
+      "marketSearchTitle": "Search Market",
+      "marketTotal": "{total} plugins",
+      "marketAction": {
+        "reinstalled": "Reinstalled",
+        "reinstalling": "Reinstalling",
+        "updated": "Updated",
+        "updating": "Updating"
+      },
+      "marketWorking": "{action} plugin {name}...",
+      "meta": {
+        "installed": "installed",
+        "market": "market",
+        "updates": "updates"
+      },
+      "noComponentsLoaded": "No components loaded.",
+      "noDescription": "No description.",
+      "noInstallSource": "{name} has no install source.",
+      "noInstalled": "No installed plugins.",
+      "noMarketLoaded": "No market plugins loaded.",
+      "noPluginConfig": "No plugin config.",
+      "package": "Package",
+      "platforms": "Platforms",
+      "reinstall": "Reinstall",
+      "reload": "Reload",
+      "reloaded": "Reloaded plugin {name}.",
+      "reloading": "Reloading plugin {name}...",
+      "repo": "Repo",
+      "reservedPlugin": "reserved plugin",
+      "selectMarketPlugin": "Select a market plugin.",
+      "selectPlugin": "Select a plugin.",
+      "selectionCanceled": "Selection canceled.",
+      "stars": "Stars",
+      "system": "System",
+      "systemCannotUninstall": "{name} is a system plugin and cannot be uninstalled.",
+      "tags": "Tags",
+      "title": "Plugins",
+      "uninstalled": "Uninstalled plugin {name}.",
+      "unknown": "unknown",
+      "update": "Update",
+      "updated": "Updated plugin {name}.",
+      "updatedOrReinstalled": "{action} plugin {name}.",
+      "updating": "Updating plugin {name}...",
+      "version": "Version",
+      "working": "Working",
+      "workingEllipsis": "Working..."
+    },
+    "providers": {
+      "actions": {
+        "add": "add",
+        "addPadded": " +",
+        "config": "edit",
+        "configIcon": "⚙",
+        "delete": "X",
+        "deletePadded": "  X",
+        "newPadded": " new ",
+        "switch": "on/off",
+        "test": "test"
+      },
+      "addedModel": "Added model {model}.",
+      "available": "Provider {id} is available.",
+      "confirmDeleteModel": "Press Enter again to delete model {id}.",
+      "confirmDeleteSource": "Press Enter again to delete source {id}.",
+      "createdProvider": "Created {template} provider {id}.",
+      "createdSource": "Created {template} source {id}. Edit settings on the right.",
+      "deletedModel": "Deleted provider {id}.",
+      "deletedSource": "Deleted provider source {id}.",
+      "detail": {
+        "context": "ctx: {context}",
+        "enterAction": "Enter: {action}",
+        "enterAdd": "Enter: add",
+        "error": "error: {error}",
+        "model": "model: {model}",
+        "source": "source: {source}"
+      },
+      "disabled": "Provider disabled.",
+      "editSourceSetting": "Edit Source Setting",
+      "editingProvider": "Editing provider {id}.",
+      "editingSource": "Editing {key}. Enter saves, Esc cancels.",
+      "empty": {
+        "selectSource": "Select a provider source.",
+        "sourceModels": "No models under this source. Select models on the source row to fetch.",
+        "sourceSettings": "No editable source settings.",
+        "sources": "No provider sources.",
+        "typedProviders": "No {type} providers."
+      },
+      "enabled": "Provider enabled.",
+      "enterEditFieldEscClose": "Enter edit field  Esc close",
+      "enterSaveFieldEscBack": "Enter save field  Esc back",
+      "fetchedModels": "Fetched {count} model(s) from {id}.",
+      "footer": {
+        "createSource": "Enter creates a new provider source.",
+        "createTypedProvider": "Enter creates a {type} provider.",
+        "editingSourceSetting": "Editing {key}. Enter saves, Esc cancels.",
+        "modelActions": "Left/Right selects row actions. Enter runs the selected model action.",
+        "selectedSourceSetting": "{key}  Enter edits. Left returns to sources, Right moves to models.",
+        "sourceActions": "Left/Right selects on/off, model count, or X. Enter runs the selected source action.",
+        "sourceSettingHelp": "Enter edits the selected source setting. Left returns to sources, Right moves to models.",
+        "testingProvider": "Testing provider {id}..."
+      },
+      "help": {
+        "flatTabs": "  Up to tabs  Down back  Enter edits",
+        "sourceTabs": "  Up to tabs  Down back  Left/Right in tabs"
+      },
+      "loading": {
+        "availableModels": "Fetching available models..."
+      },
+      "meta": {
+        "flatLayout": "{type}  {current}/{total}",
+        "loading": "loading providers",
+        "sourceLayout": "{type}  sources {sourceCurrent}/{sourceTotal}  models {modelCurrent}/{modelTotal}"
+      },
+      "metadata": {
+        "audio": "aud",
+        "image": "img",
+        "reasoning": "think",
+        "tool": "tool"
+      },
+      "modelConfigCanceled": "Model config edit canceled.",
+      "models": {
+        "availableTitle": "Available Models",
+        "configuredTitle": "Configured Models"
+      },
+      "noEditableModelSettings": "No editable model settings.",
+      "noProviderTemplateSelected": "No provider template selected.",
+      "noProviderTemplates": "No {type} provider templates available.",
+      "noSourceTemplateSelected": "No provider source template selected.",
+      "noSourceTemplates": "No provider source templates available.",
+      "noTemplates": "No templates available.",
+      "providerConfig": "Provider Config {id}",
+      "providerExists": "Provider {id} already exists.",
+      "providerIdRequired": "Provider id is required.",
+      "saved": "Saved {name}.",
+      "sections": {
+        "typedProviders": "{type} Providers"
+      },
+      "selectProvider": "Select Provider",
+      "selectProviderTemplate": "Select a provider template.",
+      "selectSourceTemplate": "Select a provider source template.",
+      "selectTemplate": "Select Template",
+      "settings": {
+        "title": "Settings"
+      },
+      "sourceDisabled": "Provider source disabled.",
+      "sourceEnabled": "Provider source enabled.",
+      "sourceExists": "Provider source {id} already exists.",
+      "sourceIdRequired": "Provider source id is required.",
+      "sourceKind": {
+        "default": "source"
+      },
+      "sources": {
+        "title": "Provider Sources"
+      },
+      "status": {
+        "available": "available",
+        "testing": "testing",
+        "unavailable": "unavailable"
+      },
+      "statusNotice": "Provider {id} is {status}.",
+      "table": {
+        "config": "Cfg",
+        "delete": "Delete",
+        "model": "Model",
+        "provider": "Provider",
+        "state": "S",
+        "status": "Status",
+        "test": "Test",
+        "typeModel": "Type / Model"
+      },
+      "testing": "Testing provider {id}...",
+      "title": "Providers",
+      "types": {
+        "agentRunner": "Agent",
+        "chatCompletion": "Chat",
+        "embedding": "Embed",
+        "rerank": "Rerank",
+        "speechToText": "STT",
+        "textToSpeech": "TTS"
+      }
+    },
+    "status": {
+      "cards": {
+        "activeAdapters": "Active adapters",
+        "allStoredMessages": "All stored messages",
+        "cpu": "CPU",
+        "currentSample": "Current sample",
+        "messageCount": "Message count",
+        "platformInstances": "Platform instances",
+        "processMemory": "Process memory",
+        "started": "Started",
+        "system": "system",
+        "threads": "Threads",
+        "todayModelCalls": "Today model calls",
+        "uptime": "Uptime"
+      },
+      "help": {
+        "rangeScroll": "Left/Right range  PageUp/PageDown scroll"
+      },
+      "model": {
+        "avgDuration": "Avg duration",
+        "avgTpm": "Avg TPM",
+        "avgTtft": "Avg TTFT",
+        "successRate": "Success rate",
+        "total": "Model total",
+        "tpm": "tpm"
+      },
+      "noRankingData": "No ranking data yet.",
+      "noTrendData": "No trend data yet.",
+      "notUpdated": "not updated",
+      "range": {
+        "1d": "1d",
+        "3d": "3d",
+        "7d": "7d"
+      },
+      "rangeLabel": "Range",
+      "rankings": {
+        "platformMessages": "Platform message ranking",
+        "providerTokens": "Provider token ranking",
+        "sessionTokens": "Session token ranking"
+      },
+      "sections": {
+        "messageOverview": "Message Overview",
+        "messageOverviewSubtitle": "message trend and platform ranking",
+        "modelCalls": "Model Calls",
+        "modelCallsSubtitle": "token usage and response metrics",
+        "rankings": "Rankings",
+        "rankingsSubtitle": "top providers and sessions in"
+      },
+      "summary": "Runtime, messages, platform traffic and model calls.",
+      "title": "System Stats",
+      "updated": "Updated"
+    }
+  }
+}

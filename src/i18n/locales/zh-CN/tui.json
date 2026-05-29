@@ -1,0 +1,662 @@
+{
+  "tui": {
+    "boot": {
+      "connecting": "正在连接 AstrBot Dashboard...",
+      "loadingChats": "正在加载聊天会话...",
+      "loadingCommands": "正在加载指令和函数工具...",
+      "loadingData": "正在加载 AstrBot Dashboard 数据...",
+      "loadingHistory": "正在加载当前聊天历史...",
+      "loadingPlatforms": "正在加载平台...",
+      "loadingPersonas": "正在加载人格...",
+      "loadingPlugins": "正在加载插件...",
+      "loadingProviders": "正在加载服务商...",
+      "loadingStats": "正在加载运行统计...",
+      "refreshed": "已刷新。"
+    },
+    "chat": {
+      "chats": "聊天",
+      "chatsFiltered": "聊天 {shown}/{total}",
+      "createdSession": "已创建新的 WebChat 会话。",
+      "emptyHint": "在下方输入内容开始对话。",
+      "emptyTitle": "开始和 AstrBot 对话",
+      "history": "历史 +{count}",
+      "newChat": "新建聊天",
+      "newChatTitle": "新建聊天",
+      "noChats": "还没有聊天。",
+      "noMatchingChats": "没有匹配的聊天。",
+      "pageUpHistory": "PageUp 查看历史",
+      "responseComplete": "回复完成。",
+      "streaming": "回复中",
+      "streamingResponse": "正在流式回复...",
+      "title": "AstrBot 聊天",
+      "workspace": "聊天工作区"
+    },
+    "cli": {
+      "description": "AstrBot Dashboard 终端工作台",
+      "labels": {
+        "server": "服务器：{serverUrl}",
+        "tokenStore": "Token 存储：{kind}",
+        "user": "用户：{username}",
+        "username": "用户名：{username}"
+      },
+      "login": {
+        "description": "登录 AstrBot Dashboard 并保存 JWT",
+        "failed": "登录失败：{error}",
+        "options": {
+          "passwordStdin": "从 stdin 读取 Dashboard 密码",
+          "username": "Dashboard 用户名"
+        },
+        "success": "已登录为 {username}，Token 已保存到 {kind}。"
+      },
+      "logout": {
+        "description": "移除已保存的 Dashboard JWT",
+        "failed": "退出登录失败：{error}",
+        "success": "已从 {serverUrl} 退出登录，Token 已从 {kind} 移除。"
+      },
+      "options": {
+        "language": "TUI 语言：en-US 或 zh-CN",
+        "server": "AstrBot Dashboard 地址"
+      },
+      "status": {
+        "description": "检查已保存会话和 Dashboard 版本"
+      }
+    },
+    "commands": {
+      "commandDisabled": "指令已禁用。",
+      "commandEnabled": "指令已启用。",
+      "commandSummary": "共 {total}，禁用 {disabled}，冲突 {conflicts}",
+      "detail": {
+        "aliases": "别名",
+        "params": "参数"
+      },
+      "enterToggles": "Enter 切换",
+      "header": {
+        "command": "指令",
+        "origin": "来源",
+        "plugin": "插件",
+        "source": "源",
+        "stateShort": "S",
+        "tool": "工具",
+        "type": "类型"
+      },
+      "help": {
+        "toggleCommand": "Enter 切换选中的指令。",
+        "toggleTool": "Enter 切换选中的工具。"
+      },
+      "leftRightSwitch": "左右键切换",
+      "loadingCommandStatus": "正在加载指令状态。",
+      "loadingCommandsShort": "正在加载指令",
+      "loadingFunctionTools": "正在加载函数工具。",
+      "loadingToolsShort": "正在加载工具",
+      "origin": {
+        "builtin": "内置",
+        "mcp": "MCP",
+        "plugin": "插件"
+      },
+      "state": {
+        "conflict": "!"
+      },
+      "suffix": {
+        "conflict": "冲突",
+        "system": "系统"
+      },
+      "title": "指令",
+      "toolDisabled": "工具已禁用。",
+      "toolEnabled": "工具已启用。",
+      "tools": "工具",
+      "totalSummary": "共 {total}，禁用 {disabled}，只读 {readonly}",
+      "type": {
+        "commandShort": "指令",
+        "group": "组",
+        "sub": "子指令"
+      }
+    },
+    "common": {
+      "add": "添加",
+      "calls": "次调用",
+      "close": "关闭",
+      "dashboard": "dashboard",
+      "deleteShort": "X",
+      "edit": "编辑",
+      "false": "false",
+      "from": "来自",
+      "install": "安装",
+      "installing": "安装中",
+      "loading": "加载中",
+      "login": "登录",
+      "name": "名称",
+      "new": "新建",
+      "none": "无",
+      "off": "关",
+      "on": "开",
+      "readonly": "只读",
+      "readonlyShort": "只读",
+      "remove": "移除",
+      "saving": "保存中",
+      "scroll": "滚动",
+      "search": "搜索",
+      "settings": "设置",
+      "stateShort": "S",
+      "status": "状态",
+      "time": {
+        "hourShort": "小时",
+        "minuteShort": "分",
+        "secondShort": "秒"
+      },
+      "tokens": "tokens",
+      "true": "true",
+      "unknown": "未知",
+      "updated": "已更新 {name}。",
+      "value": "值"
+    },
+    "console": {
+      "disconnected": "实时日志已断开：{error}",
+      "history": "历史 +{count}",
+      "liveTail": "实时尾部",
+      "title": "控制台",
+      "waitingForLogs": "等待实时日志。"
+    },
+    "agents": {
+      "confirmDelete": "再次按 Enter 删除人格 {id}。",
+      "count": "{count}",
+      "emptySettings": "没有可编辑的人格设置。",
+      "footer": {
+        "cancel": "{id}  Enter 取消编辑。",
+        "delete": "{id}  Enter 两次删除。",
+        "edit": "{id}  Enter 编辑。右键进入字段。",
+        "editing": "正在编辑 {key}。Enter 保存，Esc 取消。",
+        "fields": "Enter 编辑选中的人格设置。左键返回列表。",
+        "fieldSelected": "{key}  Enter 编辑。左键返回列表。",
+        "new": "Enter 创建人格草稿。",
+        "readonly": "{key} 是只读字段。",
+        "save": "{id}  Enter 保存更改。"
+      },
+      "hints": {
+        "dialogs": "可输入 JSON 数组，或用 | 分隔多轮对话。数量必须是用户/助手成对。",
+        "selectionList": "输入 * 表示全部，留空表示不选，或用英文逗号分隔名称。"
+      },
+      "loadingDetail": "正在加载人格 {id}...",
+      "meta": "{count} 个人格  {position}",
+      "selectPersona": "选择一个人格。",
+      "table": {
+        "skills": "Skills",
+        "tools": "Tools"
+      }
+    },
+    "keys": {
+      "enterApplyEscClose": "Enter 应用  Esc 关闭",
+      "enterContinueEscCancel": "Enter 继续  Esc 取消",
+      "enterEsc": "Enter/Esc",
+      "enterSaveEscCancel": "Enter 保存  Esc 取消",
+      "enterSelectEscCancel": "Enter 选择  Esc 取消",
+      "escClose": "Esc 关闭",
+      "tabSwitch": "Tab 切换"
+    },
+    "nav": {
+      "chat": "聊天",
+      "commands": "指令",
+      "console": "控制台",
+      "platforms": "平台",
+      "plugins": "插件",
+      "providers": "服务商",
+      "status": "状态"
+    },
+    "platforms": {
+      "adapters": {
+        "title": "适配器"
+      },
+      "alreadyLoggedIn": "{id} 已登录。",
+      "confirmDelete": "再次按 Enter 删除平台 {id}。",
+      "createCanceled": "创建已取消。",
+      "created": "已创建 {template} 适配器 {id}。请在右侧编辑设置。",
+      "deleted": "已删除平台 {id}。",
+      "disabled": "平台已禁用。",
+      "editPlatformSetting": "编辑平台设置",
+      "editing": "正在编辑 {key}。Enter 保存，Esc 取消。",
+      "empty": {
+        "adapters": "没有平台适配器。",
+        "selection": "选择一个平台适配器。",
+        "settings": "没有可编辑的适配器设置。"
+      },
+      "enabled": "平台已启用。",
+      "footer": {
+        "delete": "{id}  Enter 两次删除。",
+        "editing": "正在编辑 {key}。Enter 保存，Esc 取消。",
+        "login": "{id}  Enter 打开扫码登录。",
+        "new": "Enter 打开适配器模板选择。",
+        "runtime": "运行时  可用时 Enter 登录。下键选择设置，左键返回适配器。",
+        "selectAdapter": "选择一个适配器。",
+        "settingSelected": "{key}  Enter 编辑。上键返回运行时，左键返回运行时。",
+        "settings": "Enter 编辑选中的适配器设置。左键返回适配器。",
+        "switch": "{id}  Enter 切换开关。"
+      },
+      "idRequired": "平台 ID 不能为空。",
+      "invalidName": "平台名称无效，不能为空，也不能包含 ! 或 :。",
+      "loggedIn": "{id} 已登录。",
+      "loginCreated": "登录已创建，正在更新适配器配置...",
+      "meta": "{adapters} 个适配器  {templates} 个模板  {position}",
+      "noAdapterTemplates": "没有可用的平台适配器模板。",
+      "noTemplateSelected": "没有选择平台模板。",
+      "noTemplates": "没有可用模板。",
+      "qrTooSmall": "QR {size}x{size}。请放大终端或打开：{url}",
+      "runtime": {
+        "errors": "错误",
+        "info": {
+          "errors": "ERR {count}",
+          "qr": "QR",
+          "webhook": "Hook"
+        },
+        "lastError": "最近错误",
+        "logged": "已登录",
+        "status": {
+          "error": "错误",
+          "pending": "等待中",
+          "running": "运行中"
+        },
+        "title": "运行时",
+        "webhook": "Webhook"
+      },
+      "scanClosed": "扫码登录已关闭。",
+      "scanStarting": "正在开始扫码注册...",
+      "scanLogin": "扫码登录 {id}",
+      "scanStarted": "{id} 已开始扫码登录。",
+      "scanUnsupported": "{id} 不支持扫码登录。",
+      "scanWait": "请在浏览器/应用中扫码，然后等待创建完成。",
+      "selectAdapterTemplate": "选择一个平台适配器模板。",
+      "selectPlatform": "选择平台",
+      "settings": {
+        "platformName": "平台名称",
+        "platformNameHint": "唯一的适配器名称。"
+      },
+      "statusPending": "等待中",
+      "table": {
+        "adapter": "适配器",
+        "info": "信息",
+        "type": "类型"
+      },
+      "title": "平台",
+      "verificationCode": "验证码 {code}",
+      "waitingQr": "等待二维码或登录链接..."
+    },
+    "pluginConfig": {
+      "addEntry": "添加条目",
+      "addedFile": "已添加 {name}。",
+      "addKey": "添加键",
+      "allPlugins": "全部插件",
+      "allPluginsHint": "使用所有可用插件",
+      "builtInDefaultPersona": "内置默认人格",
+      "chunksCount": "{count} 个分块",
+      "clearSelection": "清空选择",
+      "configuredCount": "已配置 {count} 个",
+      "current": "当前  {value}",
+      "defaultPersona": "默认",
+      "deleteEntry": "删除条目",
+      "deleteKey": "删除键",
+      "deletedKey": "已删除 {name}。",
+      "docsCount": "{count} 个文档",
+      "editCanceled": "编辑已取消。",
+      "editPluginConfig": "编辑插件配置",
+      "editTemplateField": "编辑模板字段",
+      "editing": "正在编辑 {name}。Enter 保存，Esc 取消。",
+      "editingField": "正在编辑 {name}。Enter 保存字段，Esc 返回。",
+      "entry": "条目  {index}",
+      "entryLabel": "条目 {index}",
+      "escToClose": "Esc 关闭",
+      "field": "字段  {name}",
+      "fieldEditCanceled": "字段编辑已取消。",
+      "fileManagerClosed": "文件管理器已关闭。",
+      "filesTitle": "文件 {name}",
+      "hint": "提示",
+      "isConfigGroup": "{name} 是配置分组。",
+      "keyRequired": "键名不能为空。",
+      "keys": {
+        "choiceMulti": "Enter 切换  选中保存行后应用  Esc 取消",
+        "entries": "Enter 打开  右键打开  Esc 关闭",
+        "fields": "Enter 编辑  Delete 删除行  左键返回",
+        "object": "Enter 编辑/添加  左/右切换类型  Esc 关闭",
+        "objectEdit": "Tab 切换键/值  Enter 保存  Esc 返回",
+        "templates": "Enter 添加  左键返回  Esc 关闭"
+      },
+      "loadingChoices": "正在加载选项...",
+      "loadingFiles": "正在加载文件...",
+      "missing": "缺失",
+      "noChoices": "没有选项。",
+      "noChoicesLoaded": "没有加载到选项",
+      "noEntries": "没有条目。请选择添加条目。",
+      "noFiles": "没有文件。",
+      "noFilesFound": "没有找到文件",
+      "noPlugins": "不使用插件",
+      "noPluginsHint": "在此范围禁用插件工具",
+      "noTemplatesInSchema": "Schema 中没有模板。",
+      "objectTitle": "对象 {name}",
+      "objectEditorClosed": "对象编辑器已关闭。",
+      "options": "选项",
+      "optionsTitle": "{name} 选项",
+      "removedFile": "已移除 {name}。",
+      "saveSelection": "保存选择",
+      "selectKnowledgeBase": "选择知识库",
+      "selectPersona": "选择人格",
+      "selectPluginSet": "选择插件集",
+      "selectProvider": "选择服务商",
+      "selectValue": "选择值",
+      "selectedCount": "已选择 {count} 个",
+      "templateCount": "{count} 个模板",
+      "templateList": "模板列表 {name}",
+      "templateListClosed": "模板列表已关闭。",
+      "unknownTemplate": "未知模板",
+      "uploadNotWired": "上传暂未接入"
+    },
+    "plugins": {
+      "action": {
+        "delete": "X",
+        "onOff": "开/关",
+        "reload": "重载",
+        "update": "更新"
+      },
+      "actions": "操作",
+      "astrbot": "AstrBot",
+      "author": "作者",
+      "category": "分类",
+      "componentType": {
+        "command": "command",
+        "component": "component",
+        "page": "page",
+        "skill": "skill",
+        "tool": "tool"
+      },
+      "components": "组件",
+      "config": "配置",
+      "configType": {
+        "bool": "bool",
+        "boolean": "bool",
+        "dict": "dict",
+        "file": "file",
+        "float": "float",
+        "int": "int",
+        "list": "list",
+        "number": "num",
+        "object": "object",
+        "special": "special",
+        "string": "str",
+        "templateList": "tmpl",
+        "value": "value"
+      },
+      "configValue": {
+        "empty": "empty",
+        "entries": "entries",
+        "fields": "fields",
+        "files": "files",
+        "keys": "keys",
+        "section": "section"
+      },
+      "confirmMarketAction": "再次按 Enter {action} {name}。",
+      "confirmUninstall": "再次按 Enter 卸载插件 {name}。",
+      "continueWarning": "继续并忽略这个警告？",
+      "current": "当前",
+      "detail": "详情",
+      "disabled": "插件已禁用。",
+      "enabled": "插件已启用。",
+      "featured": "精选",
+      "filter": "筛选",
+      "headerAction": "操作",
+      "headerDelete": "X",
+      "headerPlugin": "插件",
+      "headerState": "S",
+      "help": {
+        "components": "上/下选择组件。左键返回列表。",
+        "marketEmpty": "市场插件加载后会显示在这里。",
+        "marketSearch": "Enter 打开居中搜索框。左/右切换标签。",
+        "tabs": "左/右切换 Installed/Market。下键进入列表。"
+      },
+      "installCanceled": "安装已取消。",
+      "installWarning": "{name} 有安装警告，请确认继续。",
+      "installWarningFallback": "安装警告。",
+      "installWarningTitle": "安装警告",
+      "installed": "已安装",
+      "installedOk": "已安装插件 {name}。",
+      "installing": "正在安装插件 {name}...",
+      "installingIgnoringWarning": "正在忽略版本警告安装插件 {name}...",
+      "latest": "最新",
+      "loadedConfig": "已加载插件 {name} 配置。",
+      "loadedDetail": "已加载插件 {name}。",
+      "loadingComponents": "正在加载插件组件...",
+      "loadingConfig": "正在加载插件 {name} 配置...",
+      "loadingConfigPlain": "正在加载插件配置...",
+      "loadingDetail": "正在加载插件 {name} 详情...",
+      "market": "市场",
+      "marketMatched": "匹配 {shown}/{total}",
+      "marketSearchHint": "输入插件名、作者、分类、标签或仓库。",
+      "marketSearchHintShort": "输入内容过滤。",
+      "marketSearchTitle": "搜索市场",
+      "marketTotal": "共 {total} 个插件",
+      "marketAction": {
+        "reinstalled": "已重新安装",
+        "reinstalling": "重新安装",
+        "updated": "已更新",
+        "updating": "更新"
+      },
+      "marketWorking": "正在{action}插件 {name}...",
+      "meta": {
+        "installed": "已安装",
+        "market": "市场",
+        "updates": "更新"
+      },
+      "noComponentsLoaded": "没有加载到组件。",
+      "noDescription": "没有介绍。",
+      "noInstallSource": "{name} 没有安装来源。",
+      "noInstalled": "没有已安装插件。",
+      "noMarketLoaded": "没有加载到市场插件。",
+      "noPluginConfig": "没有插件配置。",
+      "package": "包",
+      "platforms": "平台",
+      "reinstall": "重装",
+      "reload": "重载",
+      "reloaded": "已重载插件 {name}。",
+      "reloading": "正在重载插件 {name}...",
+      "repo": "仓库",
+      "reservedPlugin": "保留插件",
+      "selectMarketPlugin": "选择一个市场插件。",
+      "selectPlugin": "选择一个插件。",
+      "selectionCanceled": "选择已取消。",
+      "stars": "星标",
+      "system": "系统",
+      "systemCannotUninstall": "{name} 是系统插件，不能卸载。",
+      "tags": "标签",
+      "title": "插件",
+      "uninstalled": "已卸载插件 {name}。",
+      "unknown": "未知",
+      "update": "更新",
+      "updated": "已更新插件 {name}。",
+      "updatedOrReinstalled": "已{action}插件 {name}。",
+      "updating": "正在更新插件 {name}...",
+      "version": "版本",
+      "working": "执行中",
+      "workingEllipsis": "执行中..."
+    },
+    "providers": {
+      "actions": {
+        "add": "添加",
+        "addPadded": " +",
+        "config": "编辑",
+        "configIcon": "⚙",
+        "delete": "X",
+        "deletePadded": "  X",
+        "newPadded": " 新建 ",
+        "switch": "开/关",
+        "test": "测试"
+      },
+      "addedModel": "已添加模型 {model}。",
+      "available": "服务商 {id} 可用。",
+      "confirmDeleteModel": "再次按 Enter 删除模型 {id}。",
+      "confirmDeleteSource": "再次按 Enter 删除来源 {id}。",
+      "createdProvider": "已创建 {template} 服务商 {id}。",
+      "createdSource": "已创建 {template} 来源 {id}。请在右侧编辑设置。",
+      "deletedModel": "已删除服务商 {id}。",
+      "deletedSource": "已删除服务商来源 {id}。",
+      "detail": {
+        "context": "上下文：{context}",
+        "enterAction": "Enter：{action}",
+        "enterAdd": "Enter：添加",
+        "error": "错误：{error}",
+        "model": "模型：{model}",
+        "source": "来源：{source}"
+      },
+      "disabled": "服务商已禁用。",
+      "editSourceSetting": "编辑来源设置",
+      "editingProvider": "正在编辑服务商 {id}。",
+      "editingSource": "正在编辑 {key}。Enter 保存，Esc 取消。",
+      "empty": {
+        "selectSource": "选择一个服务商来源。",
+        "sourceModels": "此来源下没有模型。选中来源行的 models 进行拉取。",
+        "sourceSettings": "没有可编辑的来源设置。",
+        "sources": "没有服务商来源。",
+        "typedProviders": "没有 {type} 服务商。"
+      },
+      "enabled": "服务商已启用。",
+      "enterEditFieldEscClose": "Enter 编辑字段  Esc 关闭",
+      "enterSaveFieldEscBack": "Enter 保存字段  Esc 返回",
+      "fetchedModels": "已从 {id} 拉取 {count} 个模型。",
+      "footer": {
+        "createSource": "Enter 创建新的服务商来源。",
+        "createTypedProvider": "Enter 创建 {type} 服务商。",
+        "editingSourceSetting": "正在编辑 {key}。Enter 保存，Esc 取消。",
+        "modelActions": "左/右选择行操作。Enter 执行选中的模型操作。",
+        "selectedSourceSetting": "{key}  Enter 编辑。左键返回来源，右键进入模型。",
+        "sourceActions": "左/右选择开关、模型数量或 X。Enter 执行选中的来源操作。",
+        "sourceSettingHelp": "Enter 编辑选中的来源设置。左键返回来源，右键进入模型。",
+        "testingProvider": "正在测试服务商 {id}..."
+      },
+      "help": {
+        "flatTabs": "  上键到标签  下键返回  Enter 编辑",
+        "sourceTabs": "  上键到标签  下键返回  左/右切换标签"
+      },
+      "loading": {
+        "availableModels": "正在拉取可用模型..."
+      },
+      "meta": {
+        "flatLayout": "{type}  {current}/{total}",
+        "loading": "正在加载服务商",
+        "sourceLayout": "{type}  来源 {sourceCurrent}/{sourceTotal}  模型 {modelCurrent}/{modelTotal}"
+      },
+      "metadata": {
+        "audio": "aud",
+        "image": "img",
+        "reasoning": "think",
+        "tool": "tool"
+      },
+      "modelConfigCanceled": "模型配置编辑已取消。",
+      "models": {
+        "availableTitle": "可用模型",
+        "configuredTitle": "已配置模型"
+      },
+      "noEditableModelSettings": "没有可编辑的模型设置。",
+      "noProviderTemplateSelected": "没有选择服务商模板。",
+      "noProviderTemplates": "没有可用的 {type} 服务商模板。",
+      "noSourceTemplateSelected": "没有选择服务商来源模板。",
+      "noSourceTemplates": "没有可用的服务商来源模板。",
+      "noTemplates": "没有可用模板。",
+      "providerConfig": "服务商配置 {id}",
+      "providerExists": "服务商 {id} 已存在。",
+      "providerIdRequired": "服务商 ID 不能为空。",
+      "saved": "已保存 {name}。",
+      "sections": {
+        "typedProviders": "{type} 服务商"
+      },
+      "selectProvider": "选择服务商",
+      "selectProviderTemplate": "选择一个服务商模板。",
+      "selectSourceTemplate": "选择一个服务商来源模板。",
+      "selectTemplate": "选择模板",
+      "settings": {
+        "title": "设置"
+      },
+      "sourceDisabled": "服务商来源已禁用。",
+      "sourceEnabled": "服务商来源已启用。",
+      "sourceExists": "服务商来源 {id} 已存在。",
+      "sourceIdRequired": "服务商来源 ID 不能为空。",
+      "sourceKind": {
+        "default": "来源"
+      },
+      "sources": {
+        "title": "服务商来源"
+      },
+      "status": {
+        "available": "可用",
+        "testing": "测试中",
+        "unavailable": "不可用"
+      },
+      "statusNotice": "服务商 {id} 状态为 {status}。",
+      "table": {
+        "config": "配置",
+        "delete": "删除",
+        "model": "模型",
+        "provider": "服务商",
+        "state": "S",
+        "status": "状态",
+        "test": "测试",
+        "typeModel": "类型 / 模型"
+      },
+      "testing": "正在测试服务商 {id}...",
+      "title": "服务商",
+      "types": {
+        "agentRunner": "Agent",
+        "chatCompletion": "聊天",
+        "embedding": "嵌入",
+        "rerank": "重排",
+        "speechToText": "STT",
+        "textToSpeech": "TTS"
+      }
+    },
+    "status": {
+      "cards": {
+        "activeAdapters": "活跃适配器",
+        "allStoredMessages": "全部存储消息",
+        "cpu": "CPU",
+        "currentSample": "当前采样",
+        "messageCount": "消息数量",
+        "platformInstances": "平台实例",
+        "processMemory": "进程内存",
+        "started": "启动于",
+        "system": "系统",
+        "threads": "线程",
+        "todayModelCalls": "今日模型调用",
+        "uptime": "运行时间"
+      },
+      "help": {
+        "rangeScroll": "左右键切换范围  PageUp/PageDown 滚动"
+      },
+      "model": {
+        "avgDuration": "平均耗时",
+        "avgTpm": "平均 TPM",
+        "avgTtft": "平均 TTFT",
+        "successRate": "成功率",
+        "total": "模型总计",
+        "tpm": "tpm"
+      },
+      "noRankingData": "暂无排行数据。",
+      "noTrendData": "暂无趋势数据。",
+      "notUpdated": "尚未更新",
+      "range": {
+        "1d": "1 天",
+        "3d": "3 天",
+        "7d": "7 天"
+      },
+      "rangeLabel": "范围",
+      "rankings": {
+        "platformMessages": "平台消息排行",
+        "providerTokens": "服务商 Token 排行",
+        "sessionTokens": "会话 Token 排行"
+      },
+      "sections": {
+        "messageOverview": "消息概览",
+        "messageOverviewSubtitle": "消息趋势和平台排行",
+        "modelCalls": "模型调用",
+        "modelCallsSubtitle": "Token 用量和响应指标",
+        "rankings": "排行",
+        "rankingsSubtitle": "服务商和会话排行，范围"
+      },
+      "summary": "运行、消息、平台流量和模型调用。",
+      "title": "系统统计",
+      "updated": "更新时间"
+    }
+  }
+}

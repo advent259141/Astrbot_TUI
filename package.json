@@ -1,0 +1,39 @@
+{
+  "name": "astr-tui",
+  "version": "0.1.0",
+  "description": "Terminal workbench for AstrBot Dashboard",
+  "type": "module",
+  "bin": {
+    "astr-tui": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node -e \"const fs=require('fs'); fs.cpSync('src/i18n/locales','dist/i18n/locales',{recursive:true});\"",
+    "dev": "tsx src/cli/index.tsx",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.3.2",
+    "@types/qrcode": "^1.5.6",
+    "commander": "^12.1.0",
+    "ink": "^5.0.1",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1"
+  },
+  "optionalDependencies": {
+    "keytar": "^7.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.12",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.7"
+  }
+}
