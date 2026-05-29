@@ -793,20 +793,48 @@ export function useAppController(ctx: ControllerCtx) {
 
   useEffect(() => {
     const abort = new AbortController();
-    void (async () => {
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+
+    const scheduleReconnect = (error: unknown) => {
+      if (abort.signal.aborted) {
+        return;
+      }
+      setNotice(i18n.t("tui.console.reconnecting", "Live logs disconnected ({error}), reconnecting…", {
+        error: messageFromUnknown(error),
+      }));
+      const delay = Math.min(30000, 1000 * 2 ** Math.min(attempts, 5));
+      attempts += 1;
+      reconnectTimer = setTimeout(() => {
+        void connect();
+      }, delay);
+    };
+
+    const connect = async () => {
       try {
         for await (const log of client.liveLogs({ signal: abort.signal })) {
+          if (attempts > 0) {
+            setNotice(i18n.t("tui.console.reconnected", "Live logs reconnected."));
+            attempts = 0;
+          }
           setLogs((current) => [...current.slice(-119), log]);
         }
+        // Stream ended without error (server closed); retry.
+        scheduleReconnect(new Error("terminated"));
       } catch (error) {
         if (!abort.signal.aborted) {
-          setNotice(i18n.t("tui.console.disconnected", "Live logs disconnected: {error}", {
-            error: messageFromUnknown(error),
-          }));
+          scheduleReconnect(error);
         }
       }
-    })();
-    return () => abort.abort();
+    };
+
+    void connect();
+    return () => {
+      abort.abort();
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+    };
   }, [client]);
 
   useEffect(() => {

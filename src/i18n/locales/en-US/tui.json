@@ -151,6 +151,8 @@
     },
     "console": {
       "disconnected": "Live logs disconnected: {error}",
+      "reconnecting": "Live logs disconnected ({error}), reconnecting…",
+      "reconnected": "Live logs reconnected.",
       "history": "history +{count}",
       "liveTail": "live tail",
       "title": "Console",

@@ -151,6 +151,8 @@
     },
     "console": {
       "disconnected": "实时日志已断开：{error}",
+      "reconnecting": "实时日志已断开（{error}），正在重连…",
+      "reconnected": "实时日志已重新连接。",
       "history": "历史 +{count}",
       "liveTail": "实时尾部",
       "title": "控制台",
