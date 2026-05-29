@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-import React from "react";
+import { useState } from "react";
 import { Command } from "commander";
 import { input, password } from "@inquirer/prompts";
 import { render } from "ink";
 import { App } from "../ui/App.js";
+import { SetupView, type SetupValues } from "../ui/SetupView.js";
 import { messageFromUnknown } from "../api/errors.js";
+import type { I18n } from "../i18n/index.js";
 import {
   loadProfile,
   normalizeServerUrl,
@@ -137,93 +139,67 @@ program
     }
   });
 
+type Session = Awaited<ReturnType<typeof getAuthenticatedClient>>;
+
 async function startWorkbench(serverFlag?: string, localeFlag?: string): Promise<void> {
-  let session: Awaited<ReturnType<typeof getAuthenticatedClient>>;
+  let session: Session | null = null;
   try {
     session = await getAuthenticatedClient(serverFlag);
   } catch {
-    // No stored session for this server — guide the user through first-time setup.
-    const created = await runFirstTimeSetup(serverFlag);
-    if (!created) {
-      process.exitCode = 1;
-      return;
-    }
-    session = created;
+    // No stored session for this server — fall through to the first-run setup screen.
   }
 
+  const profile = await loadProfile();
+  const workbenchI18n = createI18n(localeFlag);
   render(
-    <App
-      client={session.client}
-      serverUrl={session.serverUrl}
-      username={session.username}
-      tokenStoreKind={session.tokenStoreKind}
+    <Root
+      i18n={workbenchI18n}
+      initialSession={session}
+      defaultServerUrl={resolveServerUrl(serverFlag || profile?.serverUrl)}
+      defaultUsername={profile?.username || "astrbot"}
       locale={localeFlag}
     />,
   );
 }
 
-async function runFirstTimeSetup(
-  serverFlag?: string,
-): Promise<Awaited<ReturnType<typeof getAuthenticatedClient>> | null> {
-  const profile = await loadProfile();
-  console.log(i18n.t("tui.cli.setup.welcome", "Welcome to AstrBot TUI"));
-  console.log(
-    i18n.t("tui.cli.setup.intro", "No saved session found. Let's connect to your AstrBot Dashboard."),
-  );
+function Root({
+  i18n: rootI18n,
+  initialSession,
+  defaultServerUrl,
+  defaultUsername,
+  locale,
+}: {
+  i18n: I18n;
+  initialSession: Session | null;
+  defaultServerUrl: string;
+  defaultUsername: string;
+  locale?: string;
+}) {
+  const [session, setSession] = useState<Session | null>(initialSession);
 
-  let serverDefault = resolveServerUrl(serverFlag || profile?.serverUrl);
-  let usernameDefault = profile?.username || "astrbot";
-
-  try {
-    for (;;) {
-      const serverUrl = normalizeServerUrl(
-        await input({
-          message: i18n.t("tui.cli.setup.serverPrompt", "AstrBot Dashboard URL"),
-          default: serverDefault,
-        }),
-      );
-      const username = await input({
-        message: i18n.t("features.auth.username", "Username"),
-        default: usernameDefault,
-      });
-      const passwordValue = await password({
-        message: i18n.t("features.auth.password", "Password"),
-        mask: "*",
-      });
-
-      console.log(i18n.t("tui.cli.setup.connecting", "Connecting to {serverUrl}...", { serverUrl }));
-      try {
-        const result = await loginSession({ serverUrl, username, password: passwordValue });
-        console.log(
-          i18n.t("tui.cli.login.success", "Logged in as {username}. Token stored with {kind}.", {
-            username: result.username,
-            kind: result.tokenStoreKind,
-          }),
-        );
-        return await getAuthenticatedClient(serverUrl);
-      } catch (error) {
-        console.error(i18n.t("tui.cli.login.failed", "Login failed: {error}", {
-          error: messageFromUnknown(error),
-        }));
-        console.error(i18n.t("tui.cli.setup.retry", "Could not connect or sign in. Please check the details and try again."));
-        serverDefault = serverUrl;
-        usernameDefault = username;
-      }
-    }
-  } catch (error) {
-    // Inquirer throws when the user aborts the prompt (e.g. Ctrl+C).
-    if (isPromptCancellation(error)) {
-      console.error(i18n.t("tui.cli.setup.cancelled", "Setup cancelled."));
-      return null;
-    }
-    throw error;
+  if (!session) {
+    return (
+      <SetupView
+        i18n={rootI18n}
+        defaultServerUrl={defaultServerUrl}
+        defaultUsername={defaultUsername}
+        onSubmit={async (values: SetupValues) => {
+          const serverUrl = normalizeServerUrl(values.serverUrl);
+          await loginSession({ serverUrl, username: values.username, password: values.password });
+          setSession(await getAuthenticatedClient(serverUrl));
+        }}
+      />
+    );
   }
-}
 
-function isPromptCancellation(error: unknown): boolean {
   return (
-    error instanceof Error &&
-    (error.name === "ExitPromptError" || /force closed|User force closed/i.test(error.message))
+    <App
+      client={session.client}
+      serverUrl={session.serverUrl}
+      username={session.username}
+      tokenStoreKind={session.tokenStoreKind}
+      locale={locale}
+    />
   );
 }
 

@@ -63,7 +63,10 @@
         "serverPrompt": "AstrBot Dashboard URL",
         "connecting": "Connecting to {serverUrl}...",
         "retry": "Could not connect or sign in. Please check the details and try again.",
-        "cancelled": "Setup cancelled."
+        "cancelled": "Setup cancelled.",
+        "hint": "Tab / ↑↓ switch fields   Enter next/connect   Esc quit",
+        "connect": "Connect",
+        "fillAll": "Please fill in the server address and username."
       },
       "status": {
         "description": "Check the stored session and Dashboard version"
