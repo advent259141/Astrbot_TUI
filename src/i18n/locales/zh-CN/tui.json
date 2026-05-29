@@ -57,6 +57,14 @@
         "language": "TUI 语言：en-US 或 zh-CN",
         "server": "AstrBot Dashboard 地址"
       },
+      "setup": {
+        "welcome": "欢迎使用 AstrBot TUI",
+        "intro": "未找到已保存的会话，先连接到你的 AstrBot Dashboard。",
+        "serverPrompt": "AstrBot Dashboard 地址",
+        "connecting": "正在连接 {serverUrl}……",
+        "retry": "连接或登录失败，请检查信息后重试。",
+        "cancelled": "已取消初始化。"
+      },
       "status": {
         "description": "检查已保存会话和 Dashboard 版本"
       }
