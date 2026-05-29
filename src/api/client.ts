@@ -2,6 +2,9 @@ import { ApiError, messageFromUnknown } from "./errors.js";
 import { parseJsonEventSource } from "./sse.js";
 import { unwrapApiEnvelope } from "./response.js";
 import type {
+  AbconfInfo,
+  AbconfListPayload,
+  AbconfMutationPayload,
   ChatSession,
   ChatSessionPayload,
   CommandsPayload,
@@ -9,6 +12,8 @@ import type {
   KnowledgeBaseListPayload,
   LoginResponse,
   LiveLogPayload,
+  PersonaFolder,
+  PersonaFolderMutationPayload,
   PersonaMutationPayload,
   PersonaItem,
   PersonaSavePayload,
@@ -155,6 +160,55 @@ export class DashboardClient {
     return this.get<AstrBotConfigPayload>("/api/config/get");
   }
 
+  async getAbconfs(): Promise<AbconfInfo[]> {
+    const payload = await this.get<AbconfListPayload>("/api/config/abconfs");
+    return payload.info_list || [];
+  }
+
+  async getAbconf(
+    id?: string,
+    options: { systemConfig?: boolean } = {},
+  ): Promise<AstrBotConfigPayload> {
+    return this.get<AstrBotConfigPayload>("/api/config/abconf", {
+      id: options.systemConfig ? undefined : id,
+      system_config: options.systemConfig ? 1 : undefined,
+    });
+  }
+
+  async updateAstrBotConfig(
+    config: Record<string, unknown>,
+    confId?: string,
+  ): Promise<void> {
+    await this.post<Record<string, never>>("/api/config/astrbot/update", {
+      config,
+      conf_id: confId,
+      id: confId,
+    });
+  }
+
+  async createAbconf(
+    name: string,
+    config?: Record<string, unknown>,
+  ): Promise<AbconfMutationPayload> {
+    return this.post<AbconfMutationPayload>("/api/config/abconf/new", {
+      name,
+      config,
+    });
+  }
+
+  async updateAbconfInfo(id: string, name: string): Promise<void> {
+    await this.post<Record<string, never>>("/api/config/abconf/update", {
+      id,
+      name,
+    });
+  }
+
+  async deleteAbconf(id: string): Promise<void> {
+    await this.post<Record<string, never>>("/api/config/abconf/delete", {
+      id,
+    });
+  }
+
   async getPlatforms(): Promise<PlatformListPayload> {
     return this.get<PlatformListPayload>("/api/config/platform/list");
   }
@@ -238,6 +292,51 @@ export class DashboardClient {
 
   async getPersonas(folderId = ""): Promise<PersonaItem[]> {
     return this.get<PersonaItem[]>("/api/persona/list", {
+      folder_id: folderId,
+    });
+  }
+
+  async getPersonaFolders(parentId = ""): Promise<PersonaFolder[]> {
+    return this.get<PersonaFolder[]>("/api/persona/folder/list", {
+      parent_id: parentId,
+    });
+  }
+
+  async getPersonaFolderTree(): Promise<PersonaFolder[]> {
+    return this.get<PersonaFolder[]>("/api/persona/folder/tree");
+  }
+
+  async createPersonaFolder(payload: {
+    name: string;
+    parent_id?: string | null;
+    description?: string | null;
+    sort_order?: number;
+  }): Promise<PersonaFolderMutationPayload> {
+    return this.post<PersonaFolderMutationPayload>(
+      "/api/persona/folder/create",
+      payload,
+    );
+  }
+
+  async updatePersonaFolder(payload: {
+    folder_id: string;
+    name?: string;
+    description?: string | null;
+    parent_id?: string | null;
+    sort_order?: number;
+  }): Promise<void> {
+    await this.post<Record<string, never>>("/api/persona/folder/update", payload);
+  }
+
+  async deletePersonaFolder(folderId: string): Promise<void> {
+    await this.post<Record<string, never>>("/api/persona/folder/delete", {
+      folder_id: folderId,
+    });
+  }
+
+  async movePersona(personaId: string, folderId: string | null): Promise<void> {
+    await this.post<Record<string, never>>("/api/persona/move", {
+      persona_id: personaId,
       folder_id: folderId,
     });
   }

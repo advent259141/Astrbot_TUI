@@ -966,7 +966,7 @@ function PluginConfigSelectedDetail({
   return (
     <Box flexDirection="column" marginTop={1}>
       <PluginConfigPreviewLine
-        label="desc"
+        label={i18n.t("tui.pluginConfig.detail.description", "Description")}
         value={description}
         width={width}
         color="cyan"
@@ -974,7 +974,7 @@ function PluginConfigSelectedDetail({
       />
       {setting.hint ? (
         <PluginConfigPreviewLine
-          label="hint"
+          label={i18n.t("tui.pluginConfig.detail.hint", "Hint")}
           value={setting.hint}
           width={width}
           color="gray"
@@ -982,14 +982,14 @@ function PluginConfigSelectedDetail({
         />
       ) : null}
       <PluginConfigPreviewLine
-        label="key"
+        label={i18n.t("tui.pluginConfig.detail.key", "Key")}
         value={setting.key}
         width={width}
         color="gray"
         maxLines={1}
       />
       <PluginConfigPreviewLine
-        label="value"
+        label={i18n.t("tui.pluginConfig.detail.value", "Value")}
         value={value}
         width={width}
         color={valueColor}
@@ -1012,7 +1012,7 @@ function PluginConfigPreviewLine({
   color: TextColor;
   maxLines: number;
 }) {
-  const labelWidth = 5;
+  const labelWidth = Math.min(12, Math.max(5, terminalWidth(label)));
   const gap = "  ";
   const contentWidth = Math.max(1, width - labelWidth - terminalWidth(gap));
   const lines = wrapCells(value || "-", contentWidth, maxLines);

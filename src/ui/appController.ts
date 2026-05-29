@@ -18,11 +18,13 @@ import {
   textFromParts,
 } from "../api/messages.js";
 import type {
+  AbconfInfo,
   ChatRecord,
   ChatSession,
   CommandItem,
   AstrBotConfigPayload,
   LiveLogPayload,
+  PersonaFolder,
   PersonaItem,
   PersonaSavePayload,
   PlatformConfig,
@@ -56,6 +58,7 @@ import {
   buildAgentFields,
   type AgentAction,
   type AgentField,
+  type AgentListEntry,
   type AgentPane,
 } from "./AgentsView.js";
 import {
@@ -68,6 +71,7 @@ import {
   CommandsView,
   type ComponentsView,
 } from "./CommandsView.js";
+import type { ConfigFileAction } from "./ConfigView.js";
 import { ConsoleView, buildConsoleLines } from "./ConsoleView.js";
 import {
   PlatformsView,
@@ -136,6 +140,7 @@ import {
   useAgentsState,
   useChatState,
   useCommandsState,
+  useConfigState,
   usePlatformsState,
   usePluginsState,
   useProvidersState,
@@ -156,6 +161,7 @@ import {
   type PendingMarketInstallWarning,
   type PendingPlatformDelete,
   type PendingProviderDelete,
+  type AstrBotConfigSetting,
   type PluginConfigChoice,
   type PluginConfigChoiceDialogState,
   type PluginConfigObjectValueType,
@@ -173,6 +179,7 @@ import {
   annotatePluginsWithMarket,
   applyPlatformRegistrationResult,
   asRecord,
+  buildAstrBotConfigSettings,
   buildPlatformTemplates,
   buildPluginConfigSettings,
   buildPluginTemplateEntry,
@@ -264,6 +271,7 @@ import type {
   AgentsState,
   ChatState,
   CommandsState,
+  ConfigState,
   PlatformsState,
   PluginsState,
   ProvidersState,
@@ -276,6 +284,7 @@ export interface ControllerCtx
     CommandsState,
     PluginsState,
     AgentsState,
+    ConfigState,
     PlatformsState,
     ProvidersState {
   client: DashboardClient;
@@ -348,6 +357,8 @@ export function useAppController(ctx: ControllerCtx) {
     pendingPlatformDelete,
     pendingPluginDeleteName,
     pendingProviderDelete,
+    personaFolders,
+    personaFolderTree,
     personas,
     platformEditCursor,
     platformEditValue,
@@ -454,6 +465,8 @@ export function useAppController(ctx: ControllerCtx) {
     setPendingPlatformDelete,
     setPendingPluginDeleteName,
     setPendingProviderDelete,
+    setPersonaFolders,
+    setPersonaFolderTree,
     setPersonas,
     setPlatformEditCursor,
     setPlatformEditValue,
@@ -532,6 +545,46 @@ export function useAppController(ctx: ControllerCtx) {
     workingMarketPluginName,
     workingPersonaId,
     workingPluginName,
+  } = ctx;
+  const {
+    abconfs,
+    configEditCursor,
+    configEditValue,
+    configFileActionDialog,
+    configPane,
+    configTab,
+    creatingPersonaFolder,
+    currentPersonaFolderId,
+    editingConfigSettingKey,
+    loadingConfig,
+    normalConfigPayload,
+    pendingConfigDeleteId,
+    savingConfig,
+    selectedAbconfIndex,
+    selectedAgentEntryIndex,
+    selectedConfigFileAction,
+    selectedConfigGroupIndex,
+    selectedConfigSettingIndex,
+    setAbconfs,
+    setConfigEditCursor,
+    setConfigEditValue,
+    setConfigFileActionDialog,
+    setConfigPane,
+    setConfigTab,
+    setCreatingPersonaFolder,
+    setCurrentPersonaFolderId,
+    setEditingConfigSettingKey,
+    setLoadingConfig,
+    setNormalConfigPayload,
+    setPendingConfigDeleteId,
+    setSavingConfig,
+    setSelectedAbconfIndex,
+    setSelectedAgentEntryIndex,
+    setSelectedConfigFileAction,
+    setSelectedConfigGroupIndex,
+    setSelectedConfigSettingIndex,
+    setSystemConfigPayload,
+    systemConfigPayload,
   } = ctx;
   const abortRef = useRef<AbortController | null>(null);
   const showChatSidebar = activeView === "chat";
@@ -674,11 +727,91 @@ export function useAppController(ctx: ControllerCtx) {
     setMarketPlugins(annotateMarketPlugins(normalizedMarket, nextPlugins));
   }, [client]);
 
-  const reloadPersonas = useCallback(async () => {
-    const payload = await client.getPersonas("");
-    setPersonas(payload || []);
-    return payload || [];
-  }, [client]);
+  const reloadPersonas = useCallback(async (folderId = currentPersonaFolderId) => {
+    const normalizedFolderId = folderId || "";
+    const [foldersPayload, personasPayload, treePayload] = await Promise.all([
+      client.getPersonaFolders(normalizedFolderId),
+      client.getPersonas(normalizedFolderId),
+      client.getPersonaFolderTree().catch(() => personaFolderTree),
+    ]);
+    setPersonaFolders(foldersPayload || []);
+    setPersonas(personasPayload || []);
+    setPersonaFolderTree(treePayload || []);
+    return personasPayload || [];
+  }, [
+    client,
+    currentPersonaFolderId,
+    personaFolderTree,
+    setPersonaFolders,
+    setPersonaFolderTree,
+  ]);
+
+  const loadConfigList = useCallback(async (preferredId?: string) => {
+    const list = await client.getAbconfs();
+    setAbconfs(list);
+    if (!list.length) {
+      setSelectedAbconfIndex(0);
+      return null;
+    }
+    const nextIndex = Math.max(
+      0,
+      preferredId
+        ? list.findIndex((item) => item.id === preferredId)
+        : selectedAbconfIndex,
+    );
+    const clampedIndex = Math.min(nextIndex, list.length - 1);
+    setSelectedAbconfIndex(clampedIndex);
+    return list[clampedIndex] || null;
+  }, [client, selectedAbconfIndex, setAbconfs, setSelectedAbconfIndex]);
+
+  const loadNormalConfig = useCallback(async (config?: AbconfInfo | null) => {
+    const target = config || abconfs[selectedAbconfIndex] || null;
+    if (!target?.id) {
+      setNormalConfigPayload(null);
+      return null;
+    }
+    setLoadingConfig(true);
+    try {
+      const payload = await client.getAbconf(target.id);
+      setNormalConfigPayload(payload);
+      setSelectedConfigSettingIndex(0);
+      setNotice(i18n.t("tui.config.loaded", "Loaded config {name}.", {
+        name: target.name || target.id,
+      }));
+      return payload;
+    } finally {
+      setLoadingConfig(false);
+    }
+  }, [
+    abconfs,
+    client,
+    i18n,
+    selectedAbconfIndex,
+    setLoadingConfig,
+    setNormalConfigPayload,
+    setSelectedConfigSettingIndex,
+  ]);
+
+  const loadSystemConfig = useCallback(async () => {
+    setLoadingConfig(true);
+    try {
+      const payload = await client.getAbconf(undefined, { systemConfig: true });
+      setSystemConfigPayload(payload);
+      setSelectedConfigSettingIndex(0);
+      setNotice(i18n.t("tui.config.loadedSystem", "Loaded system config."));
+      return payload;
+    } finally {
+      setLoadingConfig(false);
+    }
+  }, [client, i18n, setLoadingConfig, setSelectedConfigSettingIndex, setSystemConfigPayload]);
+
+  const reloadConfigs = useCallback(async () => {
+    const selectedConfig = await loadConfigList();
+    if (selectedConfig) {
+      await loadNormalConfig(selectedConfig);
+    }
+    await loadSystemConfig();
+  }, [loadConfigList, loadNormalConfig, loadSystemConfig]);
 
   const reloadProviders = useCallback(async () => {
     const payload = await client.getProviderTemplate();
@@ -738,6 +871,8 @@ export function useAppController(ctx: ControllerCtx) {
       await reloadPlugins();
       setBootStatus(i18n.t("tui.boot.loadingPersonas", "Loading personas..."));
       await reloadPersonas();
+      setBootStatus(i18n.t("tui.boot.loadingConfig", "Loading config..."));
+      await reloadConfigs();
       setBootStatus(i18n.t("tui.boot.loadingProviders", "Loading providers..."));
       await reloadProviders();
       setBootStatus(i18n.t("tui.boot.loadingPlatforms", "Loading platforms..."));
@@ -754,6 +889,7 @@ export function useAppController(ctx: ControllerCtx) {
     loadSessions,
     refreshStats,
     reloadCommands,
+    reloadConfigs,
     reloadPersonas,
     reloadPlugins,
     reloadProviders,
@@ -875,6 +1011,34 @@ export function useAppController(ctx: ControllerCtx) {
   }, [activeView, personas.length, reloadPersonas]);
 
   useEffect(() => {
+    if (activeView !== "config") {
+      return;
+    }
+    if (!abconfs.length && !normalConfigPayload && !systemConfigPayload) {
+      void reloadConfigs()
+        .catch((error) => setNotice(messageFromUnknown(error)));
+      return;
+    }
+    if (configTab === "system" && !systemConfigPayload) {
+      void loadSystemConfig()
+        .catch((error) => setNotice(messageFromUnknown(error)));
+    }
+    if (configTab === "normal" && abconfs.length && !normalConfigPayload) {
+      void loadNormalConfig()
+        .catch((error) => setNotice(messageFromUnknown(error)));
+    }
+  }, [
+    abconfs.length,
+    activeView,
+    configTab,
+    loadNormalConfig,
+    loadSystemConfig,
+    normalConfigPayload,
+    reloadConfigs,
+    systemConfigPayload,
+  ]);
+
+  useEffect(() => {
     if (activeView !== "providers" || providerTemplate) {
       return;
     }
@@ -953,8 +1117,78 @@ export function useAppController(ctx: ControllerCtx) {
   const selectedPluginConfigSetting =
     selectedPluginConfigSettings[selectedPluginConfigSettingIndex] || null;
 
-  const selectedPersona = editingPersonaDraft || personas[selectedPersonaIndex] || null;
+  const selectedAbconf = abconfs[selectedAbconfIndex] || null;
+  const selectedConfigPayload =
+    configTab === "system" ? systemConfigPayload : normalConfigPayload;
+  const selectedConfigSettings = useMemo(
+    () => buildAstrBotConfigSettings(selectedConfigPayload, i18n),
+    [i18n, selectedConfigPayload],
+  );
+  const selectedConfigGroups = useMemo(
+    () => selectedConfigSettings.filter((setting) => setting.isGroup && setting.groupKey),
+    [selectedConfigSettings],
+  );
+  const clampedConfigGroupIndex = Math.min(
+    selectedConfigGroupIndex,
+    Math.max(0, selectedConfigGroups.length - 1),
+  );
+  const selectedConfigGroup = selectedConfigGroups[clampedConfigGroupIndex] || null;
+  const selectedConfigGroupSettings = useMemo(
+    () =>
+      selectedConfigGroup
+        ? selectedConfigSettings.filter(
+            (setting) =>
+              setting.groupKey === selectedConfigGroup.groupKey &&
+              setting.id !== selectedConfigGroup.id,
+          )
+        : selectedConfigSettings.filter((setting) => !setting.isGroup),
+    [selectedConfigGroup, selectedConfigSettings],
+  );
+  const selectedConfigSettingCandidate = selectedConfigSettings[selectedConfigSettingIndex] || null;
+  const selectedConfigSetting =
+    selectedConfigSettingCandidate?.isGroup || selectedConfigSettingCandidate?.isSection
+      ? selectedConfigGroupSettings.find((setting) => !setting.isGroup && !setting.isSection) || null
+      : selectedConfigSettingCandidate || selectedConfigGroupSettings.find((setting) => !setting.isGroup && !setting.isSection) || null;
   const isEditingPersona = Boolean(editingPersonaDraft);
+  const currentPersonaFolder = useMemo(
+    () => findPersonaFolderInTree(personaFolderTree, currentPersonaFolderId),
+    [currentPersonaFolderId, personaFolderTree],
+  );
+  const currentPersonaFolderPathItems = useMemo(
+    () => personaFolderPath(personaFolderTree, currentPersonaFolderId),
+    [currentPersonaFolderId, personaFolderTree],
+  );
+  const parentPersonaFolderId =
+    currentPersonaFolderPathItems.length > 1
+      ? currentPersonaFolderPathItems[currentPersonaFolderPathItems.length - 2]?.folder_id || null
+      : null;
+  const agentEntries = useMemo<AgentListEntry[]>(() => {
+    const entries: AgentListEntry[] = [];
+    if (currentPersonaFolderId) {
+      entries.push({
+        type: "up",
+        id: "..",
+        label: i18n.t("tui.agents.folder.up", ".."),
+      });
+    }
+    for (const folder of personaFolders) {
+      entries.push({ type: "folder", id: folder.folder_id, folder });
+    }
+    personas.forEach((persona, personaIndex) => {
+      entries.push({
+        type: "persona",
+        id: persona.persona_id,
+        persona,
+        personaIndex,
+      });
+    });
+    return entries;
+  }, [currentPersonaFolderId, i18n, personaFolders, personas]);
+  const selectedAgentEntry = agentEntries[selectedAgentEntryIndex] || null;
+  const selectedPersonaIndexFromEntry =
+    selectedAgentEntry?.type === "persona" ? selectedAgentEntry.personaIndex : -1;
+  const selectedPersona = editingPersonaDraft ||
+    (selectedAgentEntry?.type === "persona" ? selectedAgentEntry.persona : null);
   const selectedAgentActions = isEditingPersona ? AGENT_EDIT_ACTIONS : AGENT_ACTIONS;
   const agentFields = useMemo(
     () => buildAgentFields(selectedPersona, isCreatingPersona, i18n),
@@ -963,7 +1197,25 @@ export function useAppController(ctx: ControllerCtx) {
   const selectedAgentField = agentFields[selectedAgentFieldIndex] || null;
 
   useEffect(() => {
-    if (selectedAgentAction === "new") {
+    if (selectedPersonaIndexFromEntry >= 0) {
+      setSelectedPersonaIndex(selectedPersonaIndexFromEntry);
+    }
+  }, [selectedPersonaIndexFromEntry, setSelectedPersonaIndex]);
+
+  useEffect(() => {
+    setSelectedAgentEntryIndex((current) =>
+      Math.min(current, Math.max(0, agentEntries.length - 1)),
+    );
+  }, [agentEntries.length, setSelectedAgentEntryIndex]);
+
+  useEffect(() => {
+    setSelectedAbconfIndex((current) =>
+      Math.min(current, Math.max(0, abconfs.length - 1)),
+    );
+  }, [abconfs.length, setSelectedAbconfIndex]);
+
+  useEffect(() => {
+    if (selectedAgentAction === "new" || selectedAgentAction === "newFolder") {
       return;
     }
     if (!selectedAgentActions.includes(selectedAgentAction)) {
@@ -997,6 +1249,28 @@ export function useAppController(ctx: ControllerCtx) {
       Math.min(current, Math.max(0, selectedPluginConfigSettings.length - 1)),
     );
   }, [selectedPluginConfigSettings.length]);
+
+  useEffect(() => {
+    setSelectedConfigSettingIndex((current) =>
+      selectedConfigSettings.some(
+        (setting) =>
+          !setting.isGroup &&
+          !setting.isSection &&
+          selectedConfigSettings.indexOf(setting) === current,
+      )
+        ? current
+        : Math.max(
+            0,
+            selectedConfigSettings.findIndex((setting) => !setting.isGroup && !setting.isSection),
+          ),
+    );
+  }, [selectedConfigSettings.length, setSelectedConfigSettingIndex]);
+
+  useEffect(() => {
+    setSelectedConfigGroupIndex((current) =>
+      Math.min(current, Math.max(0, selectedConfigGroups.length - 1)),
+    );
+  }, [selectedConfigGroups.length, setSelectedConfigGroupIndex]);
 
   useEffect(() => {
     setSelectedPlatformIndex((current) =>
@@ -1543,9 +1817,13 @@ export function useAppController(ctx: ControllerCtx) {
     if (isEditingPersona || workingPersonaId) {
       return;
     }
-    const draft = createPersonaDraft(personas);
+    const draft = {
+      ...createPersonaDraft(personas),
+      folder_id: currentPersonaFolderId,
+    };
     setPersonas((current) => [...current, draft]);
     setSelectedPersonaIndex(personas.length);
+    setSelectedAgentEntryIndex(agentEntries.length);
     setEditingPersonaDraft(draft);
     setEditingPersonaOriginal(null);
     setIsCreatingPersona(true);
@@ -1553,10 +1831,19 @@ export function useAppController(ctx: ControllerCtx) {
     setSelectedAgentAction("save");
     setSelectedAgentFieldIndex(0);
     setNotice(i18n.t("features.persona.dialog.create.title", "Create New Persona"));
-  }, [isEditingPersona, personas, workingPersonaId]);
+  }, [
+    agentEntries.length,
+    currentPersonaFolderId,
+    i18n,
+    isEditingPersona,
+    personas,
+    setSelectedAgentEntryIndex,
+    workingPersonaId,
+  ]);
 
   const beginEditSelectedPersona = useCallback(async () => {
-    const persona = personas[selectedPersonaIndex];
+    const persona =
+      selectedAgentEntry?.type === "persona" ? selectedAgentEntry.persona : null;
     if (!persona || isEditingPersona || workingPersonaId) {
       return;
     }
@@ -1583,8 +1870,7 @@ export function useAppController(ctx: ControllerCtx) {
   }, [
     client,
     isEditingPersona,
-    personas,
-    selectedPersonaIndex,
+    selectedAgentEntry,
     workingPersonaId,
   ]);
 
@@ -1632,7 +1918,7 @@ export function useAppController(ctx: ControllerCtx) {
     field: AgentField,
     nextValue: unknown,
   ) => {
-    const source = editingPersonaDraft || personas[selectedPersonaIndex];
+    const source = editingPersonaDraft || selectedPersona;
     if (!source) {
       return;
     }
@@ -1647,16 +1933,16 @@ export function useAppController(ctx: ControllerCtx) {
     setEditingPersonaDraft(nextDraft);
     setPersonas((items) =>
       items.map((item, index) =>
-        index === selectedPersonaIndex || item.persona_id === previousId
+        index === selectedPersonaIndexFromEntry || item.persona_id === previousId
           ? { ...item, ...nextDraft }
           : item,
       ),
     );
-  }, [editingPersonaDraft, personas, selectedPersonaIndex]);
+  }, [editingPersonaDraft, selectedPersona, selectedPersonaIndexFromEntry]);
 
   const beginEditAgentField = useCallback(() => {
     const field = selectedAgentField;
-    const persona = editingPersonaDraft || personas[selectedPersonaIndex];
+    const persona = editingPersonaDraft || selectedPersona;
     if (!field || !persona || editingAgentFieldKey) {
       return;
     }
@@ -1682,9 +1968,8 @@ export function useAppController(ctx: ControllerCtx) {
   }, [
     editingAgentFieldKey,
     editingPersonaDraft,
-    personas,
     selectedAgentField,
-    selectedPersonaIndex,
+    selectedPersona,
   ]);
 
   const cancelEditAgentField = useCallback(() => {
@@ -1760,6 +2045,8 @@ export function useAppController(ctx: ControllerCtx) {
       const nextId = result.persona?.persona_id || payload.persona_id;
       const nextIndex = nextPersonas.findIndex((persona) => persona.persona_id === nextId);
       setSelectedPersonaIndex(Math.max(0, nextIndex));
+      const offset = currentPersonaFolderId ? 1 : 0;
+      setSelectedAgentEntryIndex(Math.max(0, offset + personaFolders.length + nextIndex));
       setEditingPersonaDraft(null);
       setEditingPersonaOriginal(null);
       setIsCreatingPersona(false);
@@ -1778,13 +2065,17 @@ export function useAppController(ctx: ControllerCtx) {
     i18n,
     isCreatingPersona,
     personas,
+    currentPersonaFolderId,
+    personaFolders.length,
     reloadPersonas,
     selectedPersonaIndex,
+    setSelectedAgentEntryIndex,
     workingPersonaId,
   ]);
 
   const deleteSelectedPersona = useCallback(async () => {
-    const persona = personas[selectedPersonaIndex];
+    const persona =
+      selectedAgentEntry?.type === "persona" ? selectedAgentEntry.persona : null;
     if (!persona || isEditingPersona || workingPersonaId) {
       return;
     }
@@ -1800,7 +2091,9 @@ export function useAppController(ctx: ControllerCtx) {
     try {
       await client.deletePersona(persona.persona_id);
       const nextPersonas = await reloadPersonas();
-      setSelectedPersonaIndex(Math.min(selectedPersonaIndex, Math.max(0, nextPersonas.length - 1)));
+      setSelectedAgentEntryIndex((current) =>
+        Math.min(current, Math.max(0, personaFolders.length + nextPersonas.length - 1)),
+      );
       setPendingPersonaDeleteId(null);
       setAgentPane("list");
       setSelectedAgentAction("delete");
@@ -1815,15 +2108,24 @@ export function useAppController(ctx: ControllerCtx) {
     i18n,
     isEditingPersona,
     pendingPersonaDeleteId,
-    personas,
+    personaFolders.length,
     reloadPersonas,
-    selectedPersonaIndex,
+    selectedAgentEntry,
+    setSelectedAgentEntryIndex,
     workingPersonaId,
   ]);
 
   const executeSelectedAgentAction = useCallback(async () => {
     if (selectedAgentAction === "new") {
       beginCreatePersona();
+      return;
+    }
+    if (selectedAgentAction === "newFolder") {
+      setCreatingPersonaFolder({
+        mode: "folder",
+        name: "",
+        cursor: 0,
+      });
       return;
     }
     if (selectedAgentAction === "save") {
@@ -1834,14 +2136,33 @@ export function useAppController(ctx: ControllerCtx) {
       cancelPersonaEdit();
       return;
     }
+    if (selectedAgentEntry?.type === "up") {
+      setCurrentPersonaFolderId(parentPersonaFolderId);
+      setSelectedAgentEntryIndex(0);
+      setSelectedPersonaIndex(0);
+      await reloadPersonas(parentPersonaFolderId);
+      return;
+    }
+    if (selectedAgentEntry?.type === "folder") {
+      setCurrentPersonaFolderId(selectedAgentEntry.folder.folder_id);
+      setSelectedAgentEntryIndex(0);
+      setSelectedPersonaIndex(0);
+      await reloadPersonas(selectedAgentEntry.folder.folder_id);
+      return;
+    }
     await deleteSelectedPersona();
   }, [
     beginCreatePersona,
-    beginEditSelectedPersona,
     cancelPersonaEdit,
     deleteSelectedPersona,
+    parentPersonaFolderId,
+    reloadPersonas,
     savePersonaDraft,
     selectedAgentAction,
+    selectedAgentEntry,
+    setCreatingPersonaFolder,
+    setCurrentPersonaFolderId,
+    setSelectedAgentEntryIndex,
   ]);
 
   const applyPluginConfigSettingValue = useCallback(async (
@@ -1891,6 +2212,54 @@ export function useAppController(ctx: ControllerCtx) {
     reloadPlugins,
     selectedPlugin,
     workingPluginName,
+  ]);
+
+  const applyConfigSettingValue = useCallback(async (
+    setting: AstrBotConfigSetting,
+    value: unknown,
+  ) => {
+    const payload = selectedConfigPayload;
+    const config = asRecord(payload?.config);
+    const confId = configTab === "system" ? "default" : selectedAbconf?.id;
+    if (!payload || !config || !confId || savingConfig) {
+      return;
+    }
+    const nextConfig = setConfigValueAtPath(config, setting.path, value);
+    const nextPayload = {
+      ...payload,
+      config: nextConfig,
+    };
+    setSavingConfig(true);
+    if (configTab === "system") {
+      setSystemConfigPayload(nextPayload);
+    } else {
+      setNormalConfigPayload(nextPayload);
+    }
+    try {
+      await client.updateAstrBotConfig(nextConfig, confId);
+      setNotice(i18n.t("tui.common.updated", "Updated {name}.", {
+        name: setting.label || setting.key,
+      }));
+    } catch (error) {
+      if (configTab === "system") {
+        setSystemConfigPayload(payload);
+      } else {
+        setNormalConfigPayload(payload);
+      }
+      setNotice(messageFromUnknown(error));
+    } finally {
+      setSavingConfig(false);
+    }
+  }, [
+    client,
+    configTab,
+    i18n,
+    savingConfig,
+    selectedAbconf?.id,
+    selectedConfigPayload,
+    setNormalConfigPayload,
+    setSavingConfig,
+    setSystemConfigPayload,
   ]);
 
   const applyPluginTemplateListValue = useCallback(async (
@@ -2527,6 +2896,65 @@ export function useAppController(ctx: ControllerCtx) {
     }
   }, [client, i18n, plugins]);
 
+  const loadConfigSpecialChoices = useCallback(async (
+    setting: AstrBotConfigSetting,
+  ) => {
+    const special = String(setting.schema?._special || "");
+    const providerType = pluginConfigSpecialProviderType(special);
+    const providerSubtype = pluginConfigSpecialProviderSubtype(special);
+    const multi = pluginConfigSettingIsMultiChoice(setting);
+    setPluginConfigChoiceDialog({
+      setting,
+      choices: [],
+      selectedIndex: 0,
+      selectedValues: Array.isArray(setting.value) ? setting.value : [setting.value],
+      multi,
+      loading: true,
+      title: pluginConfigSpecialTitle(special, i18n),
+      applyValue: (value) => applyConfigSettingValue(setting, value),
+    });
+    try {
+      const choices = await loadPluginSpecialChoices({
+        client,
+        special,
+        providerType,
+        providerSubtype,
+        fallback: setting.value,
+        plugins,
+        i18n,
+      });
+      setPluginConfigChoiceDialog((current) =>
+        current?.setting.id === setting.id
+          ? {
+              ...current,
+              choices,
+              selectedIndex: Math.max(
+                0,
+                choices.findIndex((choice) =>
+                  current.selectedValues.some((value) =>
+                    pluginChoiceValueEquals(value, choice.value),
+                  ),
+                ),
+              ),
+              loading: false,
+            }
+          : current,
+      );
+    } catch (error) {
+      setPluginConfigChoiceDialog((current) =>
+        current?.setting.id === setting.id
+          ? {
+              ...current,
+              choices: [{ label: messageFromUnknown(error), value: setting.value }],
+              selectedIndex: 0,
+              loading: false,
+            }
+          : current,
+      );
+      setNotice(messageFromUnknown(error));
+    }
+  }, [applyConfigSettingValue, client, i18n, plugins]);
+
   const beginEditPluginConfigSetting = useCallback(() => {
     const setting = selectedPluginConfigSetting;
     if (!setting || editingPluginConfigSettingKey) {
@@ -2586,6 +3014,274 @@ export function useAppController(ctx: ControllerCtx) {
     openPluginObjectEditor,
     openPluginTemplateList,
     selectedPluginConfigSetting,
+  ]);
+
+  const beginEditConfigSetting = useCallback(() => {
+    const setting = selectedConfigSetting;
+    if (!setting || editingConfigSettingKey) {
+      return;
+    }
+    if (!setting.editable) {
+      setNotice(i18n.t("tui.pluginConfig.isConfigGroup", "{name} is a config group.", {
+        name: setting.label || setting.key,
+      }));
+      return;
+    }
+    const schemaType = normalizedPluginConfigType(setting.schema, setting.value);
+    if (schemaType === "bool") {
+      void applyConfigSettingValue(setting, !Boolean(setting.value));
+      return;
+    }
+    if (schemaType === "dict" || (schemaType === "object" && !setting.isGroup)) {
+      openPluginObjectEditor(setting, (value) => applyConfigSettingValue(setting, value));
+      return;
+    }
+    if (setting.schema?._special) {
+      void loadConfigSpecialChoices(setting);
+      return;
+    }
+    if (setting.schema?.options?.length) {
+      void openPluginConfigChoices(setting, {
+        setting,
+        choices: pluginConfigOptionChoicesForI18n(setting, i18n),
+        multi: pluginConfigSettingIsMultiChoice(setting),
+        title: i18n.t("tui.pluginConfig.optionsTitle", "{name} Options", {
+          name: setting.label || setting.key,
+        }),
+        applyValue: (value) => applyConfigSettingValue(setting, value),
+      });
+      return;
+    }
+    const nextValue = providerEditableValue(setting.value);
+    setEditingConfigSettingKey(setting.id);
+    setConfigEditValue(nextValue);
+    setConfigEditCursor(Array.from(nextValue).length);
+    setNotice(i18n.t("tui.pluginConfig.editing", "Editing {name}. Enter saves, Esc cancels.", {
+      name: setting.label || setting.key,
+    }));
+  }, [
+    applyConfigSettingValue,
+    editingConfigSettingKey,
+    i18n,
+    loadConfigSpecialChoices,
+    openPluginConfigChoices,
+    openPluginObjectEditor,
+    selectedConfigSetting,
+    setConfigEditCursor,
+    setConfigEditValue,
+    setEditingConfigSettingKey,
+  ]);
+
+  const cancelEditConfigSetting = useCallback(() => {
+    if (!editingConfigSettingKey) {
+      return;
+    }
+    setEditingConfigSettingKey(null);
+    setConfigEditValue("");
+    setConfigEditCursor(0);
+    setNotice(i18n.t("tui.pluginConfig.editCanceled", "Edit canceled."));
+  }, [
+    editingConfigSettingKey,
+    i18n,
+    setConfigEditCursor,
+    setConfigEditValue,
+    setEditingConfigSettingKey,
+  ]);
+
+  const saveConfigSetting = useCallback(async () => {
+    const setting = selectedConfigSetting;
+    if (!setting || !editingConfigSettingKey || savingConfig) {
+      return;
+    }
+    const nextValue = parsePluginConfigEditableValue(
+      configEditValue,
+      setting.value,
+      setting.schema,
+    );
+    await applyConfigSettingValue(setting, nextValue);
+    setEditingConfigSettingKey(null);
+    setConfigEditValue("");
+    setConfigEditCursor(0);
+  }, [
+    applyConfigSettingValue,
+    configEditValue,
+    editingConfigSettingKey,
+    savingConfig,
+    selectedConfigSetting,
+    setConfigEditCursor,
+    setConfigEditValue,
+    setEditingConfigSettingKey,
+  ]);
+
+  const executeSelectedConfigFileAction = useCallback(async () => {
+    const selected = selectedAbconf;
+    if (loadingConfig || savingConfig) {
+      return;
+    }
+    if (selectedConfigFileAction === "new") {
+      setConfigFileActionDialog({
+        mode: "create",
+        name: "",
+        cursor: 0,
+      });
+      return;
+    }
+    if (!selected) {
+      return;
+    }
+    if (selectedConfigFileAction === "copy") {
+      const name = `${selected.name || selected.id}-copy`;
+      setConfigFileActionDialog({
+        mode: "copy",
+        config: selected,
+        name,
+        cursor: Array.from(name).length,
+      });
+      return;
+    }
+    if (selectedConfigFileAction === "rename") {
+      if (selected.id === "default") {
+        setNotice(i18n.t("tui.config.defaultReadonly", "Default config cannot be renamed."));
+        return;
+      }
+      const name = selected.name || selected.id;
+      setConfigFileActionDialog({
+        mode: "rename",
+        config: selected,
+        name,
+        cursor: Array.from(name).length,
+      });
+      return;
+    }
+    if (selected.id === "default") {
+      setNotice(i18n.t("tui.config.defaultReadonly", "Default config cannot be deleted."));
+      return;
+    }
+    if (pendingConfigDeleteId !== selected.id) {
+      setPendingConfigDeleteId(selected.id);
+      setNotice(i18n.t("tui.config.confirmDelete", "Press Enter again to delete config {name}.", {
+        name: selected.name || selected.id,
+      }));
+      return;
+    }
+    setSavingConfig(true);
+    try {
+      await client.deleteAbconf(selected.id);
+      setPendingConfigDeleteId(null);
+      const nextConfig = await loadConfigList("default");
+      await loadNormalConfig(nextConfig);
+      setNotice(i18n.t("tui.config.deleted", "Deleted config {name}.", {
+        name: selected.name || selected.id,
+      }));
+    } catch (error) {
+      setNotice(messageFromUnknown(error));
+    } finally {
+      setSavingConfig(false);
+    }
+  }, [
+    client,
+    i18n,
+    loadConfigList,
+    loadNormalConfig,
+    loadingConfig,
+    pendingConfigDeleteId,
+    savingConfig,
+    selectedAbconf,
+    selectedConfigFileAction,
+    setConfigFileActionDialog,
+    setPendingConfigDeleteId,
+    setSavingConfig,
+  ]);
+
+  const executeConfigFileActionDialog = useCallback(async () => {
+    const dialog = configFileActionDialog;
+    if (!dialog || savingConfig) {
+      return;
+    }
+    const name = dialog.name.trim();
+    if (!name) {
+      setNotice(i18n.t("features.config.configManagement.pleaseEnterName", "Please enter a name."));
+      return;
+    }
+    const duplicate = abconfs.some((item) =>
+      item.id !== dialog.config?.id &&
+      String(item.name || "").trim() === name,
+    );
+    if (duplicate) {
+      setNotice(i18n.t("features.config.configManagement.nameExists", "Name already exists."));
+      return;
+    }
+    setSavingConfig(true);
+    try {
+      if (dialog.mode === "rename" && dialog.config?.id) {
+        await client.updateAbconfInfo(dialog.config.id, name);
+        await loadConfigList(dialog.config.id);
+        setNotice(i18n.t("tui.config.renamed", "Renamed config."));
+      } else {
+        let sourceConfig: Record<string, unknown> | undefined;
+        if (dialog.mode === "copy" && dialog.config?.id) {
+          const payload = await client.getAbconf(dialog.config.id);
+          sourceConfig = asRecord(payload.config) || undefined;
+        }
+        const result = await client.createAbconf(name, sourceConfig);
+        const nextConfig = await loadConfigList(result.conf_id);
+        await loadNormalConfig(nextConfig);
+        setConfigTab("normal");
+        setConfigPane("fileDialog");
+        setNotice(result.message || i18n.t("tui.config.created", "Created config {name}.", { name }));
+      }
+      setConfigFileActionDialog(null);
+    } catch (error) {
+      setNotice(messageFromUnknown(error));
+    } finally {
+      setSavingConfig(false);
+    }
+  }, [
+    abconfs,
+    client,
+    configFileActionDialog,
+    i18n,
+    loadConfigList,
+    loadNormalConfig,
+    savingConfig,
+    setConfigFileActionDialog,
+    setConfigPane,
+    setConfigTab,
+    setSavingConfig,
+  ]);
+
+  const executePersonaFolderDialog = useCallback(async () => {
+    const dialog = creatingPersonaFolder;
+    if (!dialog || workingPersonaId) {
+      return;
+    }
+    const name = dialog.name.trim();
+    if (!name) {
+      setNotice(i18n.t("features.persona.folder.validation.nameRequired", "Folder name is required."));
+      return;
+    }
+    setWorkingPersonaId("__folder__");
+    try {
+      const result = await client.createPersonaFolder({
+        name,
+        parent_id: currentPersonaFolderId,
+      });
+      await reloadPersonas(currentPersonaFolderId);
+      setCreatingPersonaFolder(null);
+      setNotice(result.message || i18n.t("features.persona.folder.messages.createSuccess", "Folder created successfully"));
+    } catch (error) {
+      setNotice(messageFromUnknown(error));
+    } finally {
+      setWorkingPersonaId(null);
+    }
+  }, [
+    client,
+    creatingPersonaFolder,
+    currentPersonaFolderId,
+    i18n,
+    reloadPersonas,
+    setCreatingPersonaFolder,
+    workingPersonaId,
   ]);
 
   const cancelEditPluginConfigSetting = useCallback(() => {
@@ -4373,18 +5069,65 @@ export function useAppController(ctx: ControllerCtx) {
       selectedPluginConfigSettings,
     ],
   );
-  const personaViewportHeight = Math.max(1, layout.bodyHeight - 5);
-  const personaWindowStart = useMemo(() => {
-    const maxStart = Math.max(0, personas.length - personaViewportHeight);
+  const configFileViewportHeight = Math.max(1, layout.bodyHeight - 8);
+  const abconfWindowStart = useMemo(() => {
+    const maxStart = Math.max(0, abconfs.length - configFileViewportHeight);
     return Math.min(
       maxStart,
-      Math.max(0, selectedPersonaIndex - personaViewportHeight + 1),
+      Math.max(0, selectedAbconfIndex - configFileViewportHeight + 1),
     );
-  }, [personas.length, personaViewportHeight, selectedPersonaIndex]);
-  const visiblePersonas = useMemo(
-    () => personas.slice(personaWindowStart, personaWindowStart + personaViewportHeight),
-    [personaWindowStart, personas, personaViewportHeight],
+  }, [abconfs.length, configFileViewportHeight, selectedAbconfIndex]);
+  const visibleAbconfs = useMemo(
+    () => abconfs.slice(abconfWindowStart, abconfWindowStart + configFileViewportHeight),
+    [abconfWindowStart, abconfs, configFileViewportHeight],
   );
+  const configSettingViewportHeight = Math.max(1, layout.bodyHeight - 12);
+  const selectedConfigGroupSettingIndex = Math.max(
+    0,
+    selectedConfigGroupSettings.findIndex((setting) => setting.id === selectedConfigSetting?.id),
+  );
+  const configSettingWindowStart = useMemo(() => {
+    const maxStart = Math.max(0, selectedConfigGroupSettings.length - configSettingViewportHeight);
+    return Math.min(
+      maxStart,
+      Math.max(0, selectedConfigGroupSettingIndex - configSettingViewportHeight + 1),
+    );
+  }, [
+    configSettingViewportHeight,
+    selectedConfigGroupSettingIndex,
+    selectedConfigGroupSettings.length,
+  ]);
+  const visibleConfigSettings = useMemo(
+    () =>
+      selectedConfigGroupSettings.slice(
+        configSettingWindowStart,
+        configSettingWindowStart + configSettingViewportHeight,
+      ),
+    [
+      configSettingViewportHeight,
+      configSettingWindowStart,
+      selectedConfigGroupSettings,
+    ],
+  );
+  const selectedConfigVisibleSettingIndex = selectedConfigGroupSettingIndex;
+  const personaViewportHeight = Math.max(1, layout.bodyHeight - 5);
+  const personaWindowStart = useMemo(() => {
+    const maxStart = Math.max(0, agentEntries.length - personaViewportHeight);
+    return Math.min(
+      maxStart,
+      Math.max(0, selectedAgentEntryIndex - personaViewportHeight + 1),
+    );
+  }, [agentEntries.length, personaViewportHeight, selectedAgentEntryIndex]);
+  const visibleAgentEntries = useMemo(
+    () => agentEntries.slice(personaWindowStart, personaWindowStart + personaViewportHeight),
+    [agentEntries, personaWindowStart, personaViewportHeight],
+  );
+  const currentPersonaFolderName =
+    currentPersonaFolder?.name ||
+    i18n.t("features.persona.folder.rootFolder", "Root Folder");
+  const currentPersonaFolderPath = currentPersonaFolderPathItems.length
+    ? currentPersonaFolderPathItems.map((folder) => folder.name).join(" / ")
+    : currentPersonaFolderName;
 
   const currentSessionTitle = selectedSession
     ? sessionTitle(selectedSession)
@@ -4513,16 +5256,19 @@ export function useAppController(ctx: ControllerCtx) {
   );
 
   const inputCtx: InputContext = {
+    ...ctx,
     activeView,
     agentEditCursor,
     agentEditValue,
     agentFields,
     agentPane,
+    abconfs,
     applyPluginConfigSettingValue,
     beginCreatePlatform,
     beginCreateProvider,
     beginCreateProviderSource,
     beginEditAgentField,
+    beginEditConfigSetting,
     beginEditPlatformSetting,
     beginEditPluginConfigSetting,
     beginEditProviderConfigSetting,
@@ -4532,6 +5278,7 @@ export function useAppController(ctx: ControllerCtx) {
     cancelCreateProvider,
     cancelCreateProviderSource,
     cancelEditAgentField,
+    cancelEditConfigSetting,
     cancelEditPlatformSetting,
     cancelEditPluginConfigSetting,
     cancelEditProviderConfig,
@@ -4541,11 +5288,17 @@ export function useAppController(ctx: ControllerCtx) {
     commandSummary,
     commands,
     componentsView,
+    configEditCursor,
+    configEditValue,
+    configFileActionDialog,
+    configPane,
+    configTab,
     confirmPendingMarketInstallWarning,
     consoleScrollOffset,
     createSession,
     defaultProviderModelAction,
     editingAgentFieldKey,
+    editingConfigSettingKey,
     editingPersonaDraft,
     editingPersonaOriginal,
     editingPlatformSettingKey,
@@ -4557,7 +5310,10 @@ export function useAppController(ctx: ControllerCtx) {
     executePluginFileDialogAction,
     executePluginObjectEditorAction,
     executePluginTemplateListDialog,
+    executeConfigFileActionDialog,
+    executePersonaFolderDialog,
     executeSelectedAgentAction,
+    executeSelectedConfigFileAction,
     executeSelectedMarketPluginAction,
     executeSelectedPlatformAction,
     executeSelectedPluginAction,
@@ -4579,6 +5335,7 @@ export function useAppController(ctx: ControllerCtx) {
     isTogglingCommand,
     isTogglingPlatform,
     isTogglingProvider,
+    loadingConfig,
     lastStatsUpdatedAt,
     layout,
     loadingPluginConfigName,
@@ -4595,6 +5352,7 @@ export function useAppController(ctx: ControllerCtx) {
     messageScrollOffset,
     messages,
     pendingMarketInstallWarning,
+    pendingConfigDeleteId,
     pendingMarketPluginKey,
     pendingPersonaDeleteId,
     pendingPlatformDelete,
@@ -4636,6 +5394,7 @@ export function useAppController(ctx: ControllerCtx) {
     providerTemplates,
     providerType,
     providerUsesSourceLayout,
+    saveConfigSetting,
     saveAgentField,
     savePlatformCreate,
     savePlatformSetting,
@@ -4648,7 +5407,18 @@ export function useAppController(ctx: ControllerCtx) {
     saveProviderSourceSetting,
     selectedAgentAction,
     selectedAgentActions,
+    selectedAgentEntry,
+    agentEntries,
+    selectedAbconfIndex,
+    selectedAgentEntryIndex,
     selectedAgentFieldIndex,
+    selectedConfigFileAction,
+    selectedConfigGroupIndex,
+    selectedConfigGroups,
+    selectedConfigGroupSettings,
+    selectedConfigSettingIndex,
+    selectedConfigSettings,
+    selectedConfigVisibleSettingIndex,
     selectedCommandIndex,
     selectedFilteredIndex,
     selectedMarketPluginIndex,
@@ -4686,11 +5456,18 @@ export function useAppController(ctx: ControllerCtx) {
     setAgentEditCursor,
     setAgentEditValue,
     setAgentPane,
+    setConfigEditCursor,
+    setConfigEditValue,
+    setConfigFileActionDialog,
+    setConfigPane,
+    setConfigTab,
+    setSelectedConfigGroupIndex,
     setCommandSummary,
     setCommands,
     setComponentsView,
     setConsoleScrollOffset,
     setEditingAgentFieldKey,
+    setEditingConfigSettingKey,
     setEditingPersonaDraft,
     setEditingPersonaOriginal,
     setEditingPlatformSettingKey,
@@ -4722,6 +5499,7 @@ export function useAppController(ctx: ControllerCtx) {
     setMessages,
     setNotice,
     setPendingMarketInstallWarning,
+    setPendingConfigDeleteId,
     setPendingMarketPluginKey,
     setPendingPersonaDeleteId,
     setPendingPlatformDelete,
@@ -4757,7 +5535,11 @@ export function useAppController(ctx: ControllerCtx) {
     setProviderTemplate,
     setProviderType,
     setSelectedAgentAction,
+    setSelectedAbconfIndex,
+    setSelectedAgentEntryIndex,
     setSelectedAgentFieldIndex,
+    setSelectedConfigFileAction,
+    setSelectedConfigSettingIndex,
     setSelectedCommandIndex,
     setSelectedMarketPluginIndex,
     setSelectedPersonaIndex,
@@ -4793,6 +5575,7 @@ export function useAppController(ctx: ControllerCtx) {
     setWorkingMarketPluginName,
     setWorkingPersonaId,
     setWorkingPluginName,
+    savingConfig,
     startPlatformLogin,
     stats,
     statsHistory,
@@ -4812,6 +5595,7 @@ export function useAppController(ctx: ControllerCtx) {
     abortRef,
     addSelectedAvailableProviderModel,
     agentFields,
+    agentEntries,
     allMessageRows,
     applyAgentFieldValue,
     applyPluginConfigSettingValue,
@@ -4850,6 +5634,10 @@ export function useAppController(ctx: ControllerCtx) {
     consoleMeta,
     consoleViewportHeight,
     createSession,
+    abconfWindowStart,
+    configFileViewportHeight,
+    configSettingViewportHeight,
+    configSettingWindowStart,
     currentSessionTitle,
     defaultProviderListAction,
     defaultProviderModelAction,
@@ -4858,9 +5646,12 @@ export function useAppController(ctx: ControllerCtx) {
     deleteSelectedProvider,
     deleteSelectedProviderSource,
     executePluginFileDialogAction,
+    executeConfigFileActionDialog,
+    executePersonaFolderDialog,
     executePluginObjectEditorAction,
     executePluginTemplateListDialog,
     executeSelectedAgentAction,
+    executeSelectedConfigFileAction,
     executeSelectedMarketPluginAction,
     executeSelectedPlatformAction,
     executeSelectedPluginAction,
@@ -4876,6 +5667,9 @@ export function useAppController(ctx: ControllerCtx) {
     isEditingPersona,
     layout,
     loadPluginConfigSpecialChoices,
+    loadConfigList,
+    loadNormalConfig,
+    loadSystemConfig,
     loadPluginTemplateSpecialChoices,
     loadSessionMessages,
     loadSessions,
@@ -4893,6 +5687,8 @@ export function useAppController(ctx: ControllerCtx) {
     openPluginTemplateList,
     personaViewportHeight,
     personaWindowStart,
+    currentPersonaFolderName,
+    currentPersonaFolderPath,
     platformTemplates,
     platformViewportHeight,
     platformWindowStart,
@@ -4920,6 +5716,7 @@ export function useAppController(ctx: ControllerCtx) {
     refreshAll,
     refreshStats,
     reloadCommands,
+    reloadConfigs,
     reloadPersonas,
     reloadPlatformStats,
     reloadPlatforms,
@@ -4928,6 +5725,7 @@ export function useAppController(ctx: ControllerCtx) {
     reloadSelectedPlugin,
     reloadTools,
     saveAgentField,
+    saveConfigSetting,
     savePersonaDraft,
     savePlatformCreate,
     savePlatformSetting,
@@ -4941,9 +5739,19 @@ export function useAppController(ctx: ControllerCtx) {
     saveProviderSourceCreate,
     saveProviderSourceSetting,
     selectedAgentActions,
+    selectedAgentEntry,
+    selectedAbconf,
     selectedAgentField,
     selectedAvailableProviderModels,
     selectedCommand,
+    selectedConfigFileAction,
+    selectedConfigGroupIndex,
+    selectedConfigGroups,
+    selectedConfigGroupSettings,
+    selectedConfigPayload,
+    selectedConfigSetting,
+    selectedConfigSettings,
+    selectedConfigVisibleSettingIndex,
     selectedFilteredIndex,
     selectedMarketPlugin,
     selectedPersona,
@@ -4987,10 +5795,12 @@ export function useAppController(ctx: ControllerCtx) {
     updatePluginTemplateListDialogValue,
     updateSelectedPlugin,
     visibleCommands,
+    visibleAbconfs,
+    visibleConfigSettings,
     visibleConsoleLines,
     visibleMarketPlugins,
     visibleMessageRows,
-    visiblePersonas,
+    visibleAgentEntries,
     visiblePlatforms,
     visiblePluginComponents,
     visiblePluginConfigSettings,
@@ -5001,4 +5811,42 @@ export function useAppController(ctx: ControllerCtx) {
     visibleStatusLines,
     visibleTools,
   };
+}
+
+function findPersonaFolderInTree(
+  folders: PersonaFolder[],
+  folderId: string | null,
+): PersonaFolder | null {
+  if (!folderId) {
+    return null;
+  }
+  for (const folder of folders) {
+    if (folder.folder_id === folderId) {
+      return folder;
+    }
+    const child = findPersonaFolderInTree(folder.children || [], folderId);
+    if (child) {
+      return child;
+    }
+  }
+  return null;
+}
+
+function personaFolderPath(
+  folders: PersonaFolder[],
+  folderId: string | null,
+): PersonaFolder[] {
+  if (!folderId) {
+    return [];
+  }
+  for (const folder of folders) {
+    if (folder.folder_id === folderId) {
+      return [folder];
+    }
+    const childPath = personaFolderPath(folder.children || [], folderId);
+    if (childPath.length) {
+      return [folder, ...childPath];
+    }
+  }
+  return [];
 }

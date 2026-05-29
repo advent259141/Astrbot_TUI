@@ -4,6 +4,7 @@
       "connecting": "正在连接 AstrBot Dashboard...",
       "loadingChats": "正在加载聊天会话...",
       "loadingCommands": "正在加载指令和函数工具...",
+      "loadingConfig": "正在加载配置...",
       "loadingData": "正在加载 AstrBot Dashboard 数据...",
       "loadingHistory": "正在加载当前聊天历史...",
       "loadingPlatforms": "正在加载平台...",
@@ -126,6 +127,7 @@
       "add": "添加",
       "calls": "次调用",
       "close": "关闭",
+      "confirm": "确认",
       "dashboard": "dashboard",
       "deleteShort": "X",
       "edit": "编辑",
@@ -169,6 +171,45 @@
       "title": "控制台",
       "waitingForLogs": "等待实时日志。"
     },
+    "config": {
+      "confirmDelete": "再次按 Enter 删除配置 {name}。",
+      "created": "已创建配置 {name}。",
+      "defaultReadonly": "默认配置不能在这里修改。",
+      "deleted": "已删除配置 {name}。",
+      "detail": {
+        "description": "描述",
+        "hint": "提示",
+        "key": "键",
+        "value": "值"
+      },
+      "editConfig": "编辑配置",
+      "fileActionCanceled": "操作已取消。",
+      "footer": {
+        "fileActions": "{action}  Enter 执行操作。下键返回文件。Esc 关闭。",
+        "fileButton": "Enter ??????????????",
+        "files": "{name}  Enter 加载。右键编辑设置，上键打开操作。Esc 关闭。",
+        "setting": "{name}  Enter 编辑并保存。",
+        "settings": "Enter 编辑选中的配置项。左键返回。",
+        "tabs": "?/?????/??/?????Enter ???"
+      },
+      "loaded": "已加载配置 {name}。",
+      "loadedSystem": "已加载系统配置。",
+      "meta": {
+        "normal": "{count} 个配置  {position}",
+        "system": "系统配置"
+      },
+      "nameHint": "使用短名称显示在配置列表中。",
+      "newConfigHint": "从默认配置创建。",
+      "noFiles": "?????",
+      "noSettings": "没有配置项。",
+      "renamed": "已重命名配置。",
+      "source": "来源",
+      "table": {
+        "field": "字段",
+        "type": "类型",
+        "value": "值"
+      }
+    },
     "agents": {
       "confirmDelete": "再次按 Enter 删除人格 {id}。",
       "count": "{count}",
@@ -181,8 +222,15 @@
         "fields": "Enter 编辑选中的人格设置。左键返回列表。",
         "fieldSelected": "{key}  Enter 编辑。左键返回列表。",
         "new": "Enter 创建人格草稿。",
+        "newFolder": "Enter 在当前目录创建文件夹。",
+        "openFolder": "{name}  Enter 打开文件夹。",
+        "parentFolder": "Enter 返回上级目录。",
         "readonly": "{key} 是只读字段。",
         "save": "{id}  Enter 保存更改。"
+      },
+      "folder": {
+        "parent": "上级目录",
+        "up": ".."
       },
       "hints": {
         "dialogs": "可输入 JSON 数组，或用 | 分隔多轮对话。数量必须是用户/助手成对。",
@@ -312,6 +360,7 @@
       "editTemplateField": "编辑模板字段",
       "editing": "正在编辑 {name}。Enter 保存，Esc 取消。",
       "editingField": "正在编辑 {name}。Enter 保存字段，Esc 返回。",
+      "editorType": "{type} 编辑器",
       "entry": "条目  {index}",
       "entryLabel": "条目 {index}",
       "escToClose": "Esc 关闭",
@@ -322,6 +371,12 @@
       "hint": "提示",
       "isConfigGroup": "{name} 是配置分组。",
       "keyRequired": "键名不能为空。",
+      "detail": {
+        "description": "描述",
+        "hint": "提示",
+        "key": "键",
+        "value": "值"
+      },
       "keys": {
         "choiceMulti": "Enter 切换  选中保存行后应用  Esc 取消",
         "entries": "Enter 打开  右键打开  Esc 关闭",
@@ -356,6 +411,7 @@
       "templateCount": "{count} 个模板",
       "templateList": "模板列表 {name}",
       "templateListClosed": "模板列表已关闭。",
+      "typeLine": "类型  {type}",
       "unknownTemplate": "未知模板",
       "uploadNotWired": "上传暂未接入"
     },
@@ -416,10 +472,18 @@
       "headerPlugin": "插件",
       "headerState": "S",
       "help": {
+        "actions": "{name}  Enter：{action}。左键返回列表，下键进入组件。",
+        "componentSelected": "{type} {name}  下键进入配置，左键返回列表。",
         "components": "上/下选择组件。左键返回列表。",
+        "config": "{name} 配置  Enter 修改选中字段。上键返回组件，左键返回列表。",
+        "confirmUninstall": "再次按 Enter 卸载 {name}。",
+        "list": "{name}  Enter：{action}。右键越过 X 进入操作，上键返回标签。",
+        "marketActions": "{name}  上/下滚动详情。Enter：{action}。左键返回列表。",
         "marketEmpty": "市场插件加载后会显示在这里。",
+        "marketList": "{name}  右键选择 {action}，Enter 打开操作。上键返回标签。",
         "marketSearch": "Enter 打开居中搜索框。左/右切换标签。",
-        "tabs": "左/右切换 Installed/Market。下键进入列表。"
+        "tabs": "左/右切换 Installed/Market。下键进入列表。",
+        "workingOn": "正在处理 {name}..."
       },
       "installCanceled": "安装已取消。",
       "installWarning": "{name} 有安装警告，请确认继续。",

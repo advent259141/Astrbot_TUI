@@ -4,6 +4,7 @@
       "connecting": "Connecting to AstrBot Dashboard...",
       "loadingChats": "Loading chat sessions...",
       "loadingCommands": "Loading commands and function tools...",
+      "loadingConfig": "Loading config...",
       "loadingData": "Loading AstrBot Dashboard data...",
       "loadingHistory": "Loading current chat history...",
       "loadingPlatforms": "Loading platforms...",
@@ -126,6 +127,7 @@
       "add": "Add",
       "calls": "calls",
       "close": "Close",
+      "confirm": "confirm",
       "dashboard": "dashboard",
       "deleteShort": "X",
       "edit": "Edit",
@@ -169,6 +171,45 @@
       "title": "Console",
       "waitingForLogs": "Waiting for live logs."
     },
+    "config": {
+      "confirmDelete": "Press Enter again to delete config {name}.",
+      "created": "Created config {name}.",
+      "defaultReadonly": "Default config cannot be changed here.",
+      "deleted": "Deleted config {name}.",
+      "detail": {
+        "description": "Description",
+        "hint": "Hint",
+        "key": "Key",
+        "value": "Value"
+      },
+      "editConfig": "Edit Config",
+      "fileActionCanceled": "Action canceled.",
+      "footer": {
+        "fileActions": "{action}  Enter runs action. Down returns to files. Esc closes.",
+        "fileButton": "Enter opens config file manager. Left returns to System.",
+        "files": "{name}  Enter loads. Right edits settings. Up opens actions. Esc closes.",
+        "setting": "{name}  Enter edits and saves.",
+        "settings": "Enter edits the selected config setting. Left returns.",
+        "tabs": "Left/Right switches Normal/System/Config Files. Enter opens."
+      },
+      "loaded": "Loaded config {name}.",
+      "loadedSystem": "Loaded system config.",
+      "meta": {
+        "normal": "{count} configs  {position}",
+        "system": "System config"
+      },
+      "nameHint": "Use a short name shown in the config list.",
+      "newConfigHint": "Create from default config.",
+      "noFiles": "No config files.",
+      "noSettings": "No config settings.",
+      "renamed": "Renamed config.",
+      "source": "Source",
+      "table": {
+        "field": "Field",
+        "type": "Type",
+        "value": "Value"
+      }
+    },
     "agents": {
       "confirmDelete": "Press Enter again to delete persona {id}.",
       "count": "{count}",
@@ -181,8 +222,15 @@
         "fields": "Enter edits the selected persona setting. Left returns to list.",
         "fieldSelected": "{key}  Enter edits. Left returns to list.",
         "new": "Enter creates a draft persona.",
+        "newFolder": "Enter creates a folder in the current folder.",
+        "openFolder": "{name}  Enter opens folder.",
+        "parentFolder": "Enter returns to the parent folder.",
         "readonly": "{key} is read-only.",
         "save": "{id}  Enter saves changes."
+      },
+      "folder": {
+        "parent": "parent",
+        "up": ".."
       },
       "hints": {
         "dialogs": "JSON array or lines split by |. Must contain user/assistant pairs.",
@@ -312,6 +360,7 @@
       "editTemplateField": "Edit Template Field",
       "editing": "Editing {name}. Enter saves, Esc cancels.",
       "editingField": "Editing {name}. Enter saves field, Esc returns.",
+      "editorType": "{type} editor",
       "entry": "Entry  {index}",
       "entryLabel": "Entry {index}",
       "escToClose": "Esc to close",
@@ -322,6 +371,12 @@
       "hint": "Hint",
       "isConfigGroup": "{name} is a config group.",
       "keyRequired": "Key is required.",
+      "detail": {
+        "description": "Description",
+        "hint": "Hint",
+        "key": "Key",
+        "value": "Value"
+      },
       "keys": {
         "choiceMulti": "Enter toggle  Save row applies  Esc cancel",
         "entries": "Enter open  Right open  Esc close",
@@ -356,6 +411,7 @@
       "templateCount": "{count} templates",
       "templateList": "Template List {name}",
       "templateListClosed": "Template list closed.",
+      "typeLine": "Type   {type}",
       "unknownTemplate": "unknown template",
       "uploadNotWired": "Upload is not wired yet"
     },
@@ -417,9 +473,17 @@
       "headerState": "S",
       "help": {
         "components": "Down opens config, Left returns to list.",
+        "actions": "{name}  Enter: {action}. Left returns to list, Down opens components.",
+        "componentSelected": "{type} {name}  Down opens config, Left returns to list.",
+        "config": "{name} config  Enter changes selected field. Up returns to components, Left returns to list.",
+        "confirmUninstall": "Press Enter again to uninstall {name}.",
+        "list": "{name}  Enter: {action}. Right past X opens actions, Up returns to tabs.",
         "marketEmpty": "Search filters the market. Enter opens the search box.",
+        "marketActions": "{name}  Up/Down scrolls detail. Enter: {action}. Left returns to list.",
+        "marketList": "{name}  Right selects {action}, Enter opens action. Up returns to tabs.",
         "marketSearch": "Enter opens search. Left returns to tabs. Down opens results.",
-        "tabs": "Left/Right moves across the top row. Down or Enter opens the selected tab."
+        "tabs": "Left/Right moves across the top row. Down or Enter opens the selected tab.",
+        "workingOn": "Working on {name}..."
       },
       "installCanceled": "Install canceled.",
       "installWarning": "Install warning for {name}. Confirm to continue.",

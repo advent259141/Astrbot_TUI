@@ -146,7 +146,7 @@ async function startWorkbench(serverFlag?: string, localeFlag?: string): Promise
   try {
     session = await getAuthenticatedClient(serverFlag);
   } catch {
-    // No stored session for this server — fall through to the first-run setup screen.
+    // No stored session for this server; fall through to the first-run setup screen.
   }
 
   const profile = await loadProfile();

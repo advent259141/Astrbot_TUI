@@ -31,6 +31,7 @@ import type { DialogColor } from "./dialogControls.js";
 import {
   MAIN_VIEWS,
   PLATFORM_REGISTRATION_TYPES,
+  type AstrBotConfigSetting,
   type MainView,
   type PluginConfigChoice,
   type PluginConfigChoiceDialogState,
@@ -83,10 +84,226 @@ export function viewLabel(view: MainView, i18n: I18n): string {
   if (view === "agents") {
     return i18n.t("core.navigation.persona", "Persona");
   }
+  if (view === "config") {
+    return i18n.t("core.navigation.config", "Config");
+  }
   if (view === "platforms") {
     return i18n.t("core.navigation.platforms", "Platforms");
   }
   return i18n.t("core.navigation.providers", "Providers");
+}
+
+export function buildAstrBotConfigSettings(
+  payload: AstrBotConfigPayload | null,
+  i18n: I18n,
+): AstrBotConfigSetting[] {
+  const config = asRecord(payload?.config);
+  const metadata = asRecord(payload?.metadata);
+  if (!config) {
+    return [];
+  }
+  if (!metadata) {
+    return Object.entries(config).map(([key, value]) =>
+      rawAstrBotConfigSetting(key, [key], value, 0),
+    );
+  }
+
+  const settings: AstrBotConfigSetting[] = [];
+  const seenPaths = new Set<string>();
+  for (const [groupKey, groupRaw] of Object.entries(metadata)) {
+    const group = asRecord(groupRaw);
+    const sections = asRecord(group?.metadata);
+    if (!sections) {
+      continue;
+    }
+    const groupLabel = resolveConfigText(
+      i18n,
+      [groupKey],
+      "name",
+      group?.name || groupKey,
+    );
+    const groupSettings: AstrBotConfigSetting[] = [];
+    groupSettings.push({
+      id: pluginConfigSettingId(["__group__", groupKey]),
+      key: groupKey,
+      path: [groupKey],
+      configPath: [groupKey],
+      label: groupLabel,
+      value: null,
+      schema: { type: "object", items: {} },
+      depth: 0,
+      editable: false,
+      isGroup: true,
+      groupKey,
+    });
+
+    for (const [sectionKey, sectionRaw] of Object.entries(sections)) {
+      const section = asSchemaItem(sectionRaw);
+      if (!section || section.invisible) {
+        continue;
+      }
+      const sectionSettings: AstrBotConfigSetting[] = [];
+      appendAstrBotConfigSetting(sectionSettings, {
+        groupKey,
+        sectionKey,
+        key: sectionKey,
+        metadataPath: [groupKey, sectionKey],
+        path: [],
+        value: config,
+        schema: section,
+        depth: 1,
+        rootValue: config,
+        i18n,
+        seenPaths,
+      });
+      if (sectionSettings.some((setting) => !setting.isSection)) {
+        groupSettings.push(...sectionSettings);
+      }
+    }
+    if (groupSettings.length > 1) {
+      settings.push(...groupSettings);
+    }
+  }
+
+  return settings;
+}
+
+function appendAstrBotConfigSetting(
+  settings: AstrBotConfigSetting[],
+  item: {
+    groupKey: string;
+    sectionKey: string;
+    key: string;
+    metadataPath: string[];
+    path: string[];
+    value: unknown;
+    schema: PluginConfigSchemaItem;
+    depth: number;
+    rootValue: Record<string, unknown>;
+    i18n: I18n;
+    seenPaths: Set<string>;
+  },
+): void {
+  if (item.schema.invisible || !pluginConfigConditionMatchesDotted(item.rootValue, item.schema.condition)) {
+    return;
+  }
+  const type = normalizedPluginConfigType(item.schema, item.value);
+  const childItems = asSchemaItems(item.schema.items);
+  const isSection = item.path.length === 0;
+  const isGroup = !isSection && Boolean(type === "object" && childItems);
+  const label = resolveConfigText(
+    item.i18n,
+    item.metadataPath,
+    "description",
+    item.schema.description || item.schema.name || item.key,
+  );
+  const hint = resolveConfigText(
+    item.i18n,
+    item.metadataPath,
+    "hint",
+    item.schema.hint || "",
+  );
+  const configPath = item.path.flatMap((part) => splitDottedPath(part));
+  const settingPath = configPath.length ? configPath : item.path;
+  if (!isGroup && !isSection && settingPath.length) {
+    item.seenPaths.add(settingPath.join("."));
+  }
+  settings.push({
+    id: pluginConfigSettingId(["config", ...item.metadataPath]),
+    key: item.key,
+    path: settingPath,
+    configPath: item.metadataPath,
+    label,
+    value: item.value,
+    schema: item.schema,
+    depth: item.depth,
+    editable: !isSection && !isGroup && !item.schema.readonly,
+    isGroup,
+    isSection,
+    hint,
+    groupKey: item.groupKey,
+    sectionKey: item.sectionKey,
+  });
+
+  if (!childItems || (!isGroup && !isSection)) {
+    return;
+  }
+  for (const [childKey, childSchema] of Object.entries(childItems)) {
+    const childPath = isSection ? [childKey] : [...item.path, childKey];
+    appendAstrBotConfigSetting(settings, {
+      groupKey: item.groupKey,
+      sectionKey: item.sectionKey,
+      key: childKey,
+      metadataPath: [...item.metadataPath, ...splitDottedPath(childKey)],
+      path: childPath,
+      value: readConfigValueByPathSegments(item.rootValue, childPath),
+      schema: childSchema,
+      depth: item.depth + 1,
+      rootValue: item.rootValue,
+      i18n: item.i18n,
+      seenPaths: item.seenPaths,
+    });
+  }
+}
+
+function rawAstrBotConfigSetting(
+  key: string,
+  path: string[],
+  value: unknown,
+  depth: number,
+): AstrBotConfigSetting {
+  const schema = { type: inferPluginConfigValueType(value) };
+  return {
+    id: pluginConfigSettingId(path),
+    key,
+    path,
+    label: key,
+    value,
+    schema,
+    depth,
+    editable: true,
+    isGroup: false,
+    configPath: path,
+  };
+}
+
+export function readConfigValueByDottedPath(
+  config: Record<string, unknown>,
+  dottedPath: string,
+  fallback?: unknown,
+): unknown {
+  return readConfigValue(config, splitDottedPath(dottedPath), fallback);
+}
+
+function readConfigValueByPathSegments(
+  config: Record<string, unknown>,
+  path: string[],
+  fallback?: unknown,
+): unknown {
+  return readConfigValue(
+    config,
+    path.flatMap((part) => splitDottedPath(part)),
+    fallback,
+  );
+}
+
+export function pluginConfigConditionMatchesDotted(
+  rootValue: Record<string, unknown>,
+  condition?: Record<string, unknown>,
+): boolean {
+  if (!condition) {
+    return true;
+  }
+  for (const [selector, expectedValue] of Object.entries(condition)) {
+    if (!pluginChoiceValueEquals(readConfigValueByDottedPath(rootValue, selector), expectedValue)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function splitDottedPath(value: string): string[] {
+  return value.split(".").filter(Boolean);
 }
 
 export function buildPluginConfigSettings(
@@ -953,12 +1170,10 @@ export async function loadPluginSpecialChoices({
       {
         label: i18n.t("core.shared.personaSelector.defaultPersona", "Default"),
         value: "default",
-        description: i18n.t("tui.pluginConfig.builtInDefaultPersona", "Built-in default persona"),
       },
       ...personas.map((persona) => ({
         label: String(persona.persona_id || persona.name || "-"),
         value: String(persona.persona_id || ""),
-        description: truncateCells(String(persona.system_prompt || ""), 60),
       })),
     ];
   } else if (special === "select_knowledgebase") {

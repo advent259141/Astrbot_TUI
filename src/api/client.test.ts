@@ -326,6 +326,123 @@ describe("DashboardClient", () => {
     );
   });
 
+  it("manages AstrBot config files through dashboard endpoints", async () => {
+    const client = new DashboardClient({
+      baseUrl: "http://localhost:6185",
+      token: "jwt",
+    });
+
+    mockFetchJson({
+      status: "ok",
+      data: { info_list: [{ id: "default", name: "Default" }] },
+    });
+    await expect(client.getAbconfs()).resolves.toEqual([
+      { id: "default", name: "Default" },
+    ]);
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/config/abconfs"),
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    mockFetchJson({
+      status: "ok",
+      data: { config: { provider_settings: { enable: true } }, metadata: {} },
+    });
+    await expect(client.getAbconf("default")).resolves.toMatchObject({
+      config: { provider_settings: { enable: true } },
+    });
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/config/abconf?id=default"),
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    mockFetchJson({
+      status: "ok",
+      data: { config: { dashboard: { enabled: true } }, metadata: {} },
+    });
+    await expect(client.getAbconf(undefined, { systemConfig: true })).resolves.toMatchObject({
+      config: { dashboard: { enabled: true } },
+    });
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/config/abconf?system_config=1"),
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    mockFetchJson({ status: "ok", data: null });
+    await expect(
+      client.updateAstrBotConfig({ provider_settings: { enable: false } }, "default"),
+    ).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/config/astrbot/update"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          config: { provider_settings: { enable: false } },
+          conf_id: "default",
+          id: "default",
+        }),
+      }),
+    );
+  });
+
+  it("manages persona folders through dashboard endpoints", async () => {
+    const client = new DashboardClient({
+      baseUrl: "http://localhost:6185",
+      token: "jwt",
+    });
+
+    mockFetchJson({
+      status: "ok",
+      data: [{ folder_id: "f1", name: "General", parent_id: null }],
+    });
+    await expect(client.getPersonaFolders()).resolves.toEqual([
+      { folder_id: "f1", name: "General", parent_id: null },
+    ]);
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/persona/folder/list?parent_id="),
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    mockFetchJson({
+      status: "ok",
+      data: [{ folder_id: "f1", name: "General", children: [] }],
+    });
+    await expect(client.getPersonaFolderTree()).resolves.toEqual([
+      { folder_id: "f1", name: "General", children: [] },
+    ]);
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/persona/folder/tree"),
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    mockFetchJson({
+      status: "ok",
+      data: { folder: { folder_id: "f2", name: "New" } },
+    });
+    await expect(
+      client.createPersonaFolder({ name: "New", parent_id: null }),
+    ).resolves.toMatchObject({
+      folder: { folder_id: "f2" },
+    });
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/persona/folder/create"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ name: "New", parent_id: null }),
+      }),
+    );
+
+    mockFetchJson({ status: "ok", data: null });
+    await expect(client.movePersona("assistant", "f2")).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/persona/move"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ persona_id: "assistant", folder_id: "f2" }),
+      }),
+    );
+  });
+
   it("manages plugin config file lists", async () => {
     const client = new DashboardClient({
       baseUrl: "http://localhost:6185",

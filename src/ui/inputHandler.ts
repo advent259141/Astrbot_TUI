@@ -6,6 +6,7 @@ import {
   PROVIDER_MODEL_ACTIONS,
   PROVIDER_SOURCE_ROW_ACTIONS,
   TOKEN_RANGES,
+  type AstrBotConfigSetting,
   type MainView,
 } from "./App.types.js";
 import { PROVIDER_TYPES } from "./ProvidersView.js";
@@ -25,6 +26,7 @@ import type {
   AgentsState,
   ChatState,
   CommandsState,
+  ConfigState,
   PlatformsState,
   PluginsState,
   ProvidersState,
@@ -37,6 +39,7 @@ export interface InputContext
     CommandsState,
     PluginsState,
     AgentsState,
+    ConfigState,
     PlatformsState,
     ProvidersState {
   activeView: MainView;
@@ -50,6 +53,7 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
     activeView,
     agentEditCursor,
     agentEditValue,
+    agentEntries,
     agentFields,
     agentPane,
     applyPluginConfigSettingValue,
@@ -86,6 +90,7 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
     executePluginFileDialogAction,
     executePluginObjectEditorAction,
     executePluginTemplateListDialog,
+    executePersonaFolderDialog,
     executeSelectedAgentAction,
     executeSelectedMarketPluginAction,
     executeSelectedPlatformAction,
@@ -103,6 +108,7 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
     isCreatingProviderSource,
     isEditingMarketFilter,
     isEditingPersona,
+    loadNormalConfig,
     layout,
     marketFilter,
     marketFilterCursor,
@@ -155,6 +161,8 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
     saveProviderSourceSetting,
     selectedAgentAction,
     selectedAgentActions,
+    selectedAgentEntry,
+    selectedAgentEntryIndex,
     selectedAgentFieldIndex,
     selectedFilteredIndex,
     selectedMarketPluginIndex,
@@ -219,6 +227,7 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
     setProviderSourceEditValue,
     setProviderType,
     setSelectedAgentAction,
+    setSelectedAgentEntryIndex,
     setSelectedAgentFieldIndex,
     setSelectedCommandIndex,
     setSelectedMarketPluginIndex,
@@ -250,6 +259,70 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
     toggleSelectedTool,
     tools,
   } = ctx;
+  const {
+    abconfs,
+    beginEditConfigSetting,
+    cancelEditConfigSetting,
+    configEditCursor,
+    configEditValue,
+    configFileActionDialog,
+    configPane,
+    configTab,
+    editingConfigSettingKey,
+    executeConfigFileActionDialog,
+    executeSelectedConfigFileAction,
+    loadingConfig,
+    pendingConfigDeleteId,
+    saveConfigSetting,
+    savingConfig,
+    selectedAbconfIndex,
+    selectedConfigFileAction,
+    selectedConfigGroupIndex,
+    selectedConfigGroups,
+    selectedConfigSettingIndex,
+    selectedConfigSettings,
+    setConfigEditCursor,
+    setConfigEditValue,
+    setConfigFileActionDialog,
+    setConfigPane,
+    setConfigTab,
+    setEditingConfigSettingKey,
+    setPendingConfigDeleteId,
+    setSelectedAbconfIndex,
+    setSelectedConfigFileAction,
+    setSelectedConfigGroupIndex,
+    setSelectedConfigSettingIndex,
+  } = ctx;
+  const currentConfigGroupSettings = () => {
+    const group = selectedConfigGroups[
+      Math.min(selectedConfigGroupIndex, Math.max(0, selectedConfigGroups.length - 1))
+    ];
+    if (!group?.groupKey) {
+      return selectedConfigSettings
+        .map((setting: AstrBotConfigSetting, index: number) => ({ setting, index }))
+        .filter(({ setting }: { setting: AstrBotConfigSetting; index: number }) =>
+          !setting.isGroup && !setting.isSection)
+        .map(({ index }: { setting: AstrBotConfigSetting; index: number }) => index);
+    }
+    return selectedConfigSettings
+      .map((setting: AstrBotConfigSetting, index: number) => ({ setting, index }))
+      .filter(({ setting }: { setting: AstrBotConfigSetting; index: number }) =>
+        setting.groupKey === group.groupKey && !setting.isGroup && !setting.isSection)
+      .map(({ index }: { setting: AstrBotConfigSetting; index: number }) => index);
+  };
+  const selectConfigGroupFirstSetting = (groupIndex: number) => {
+    const group = selectedConfigGroups[
+      Math.min(Math.max(0, groupIndex), Math.max(0, selectedConfigGroups.length - 1))
+    ];
+    const firstIndex = selectedConfigSettings.findIndex(
+      (setting: AstrBotConfigSetting) =>
+        setting.groupKey === group?.groupKey && !setting.isGroup && !setting.isSection,
+    );
+    setSelectedConfigSettingIndex(firstIndex >= 0 ? firstIndex : 0);
+  };
+  const configDetailPane = () => selectedConfigGroups.length > 1 ? "groups" : "settings";
+  const configBackPane = () =>
+    selectedConfigGroups.length > 1 ? "groups" : "tabs";
     if (key.ctrl && value === "c") {
       exit();
       return;
@@ -263,6 +336,76 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
       if (key.return) {
         void confirmPendingMarketInstallWarning();
         return;
+      }
+      return;
+    }
+    if (configFileActionDialog || ctx.creatingPersonaFolder) {
+      const dialog = configFileActionDialog || ctx.creatingPersonaFolder;
+      const setDialog = configFileActionDialog
+        ? setConfigFileActionDialog
+        : ctx.setCreatingPersonaFolder;
+      const executeDialog = configFileActionDialog
+        ? executeConfigFileActionDialog
+        : executePersonaFolderDialog;
+      if (key.escape) {
+        setDialog(null);
+        setNotice(i18n.t("tui.config.fileActionCanceled", "Action canceled."));
+        return;
+      }
+      if (key.return) {
+        void executeDialog();
+        return;
+      }
+      if (key.leftArrow) {
+        setDialog((current: typeof dialog | null) =>
+          current ? { ...current, cursor: Math.max(0, current.cursor - 1) } : current,
+        );
+        return;
+      }
+      if (key.rightArrow) {
+        setDialog((current: typeof dialog | null) =>
+          current
+            ? {
+                ...current,
+                cursor: Math.min(Array.from(current.name).length, current.cursor + 1),
+              }
+            : current,
+        );
+        return;
+      }
+      if (key.backspace) {
+        setDialog((current: typeof dialog | null) =>
+          current
+            ? {
+                ...current,
+                name: removeAtCursor(current.name, current.cursor, "backward"),
+                cursor: Math.max(0, current.cursor - 1),
+              }
+            : current,
+        );
+        return;
+      }
+      if (key.delete) {
+        setDialog((current: typeof dialog | null) =>
+          current
+            ? {
+                ...current,
+                name: removeAtCursor(current.name, current.cursor, "forward"),
+              }
+            : current,
+        );
+        return;
+      }
+      if (!key.ctrl && value) {
+        setDialog((current: typeof dialog | null) =>
+          current
+            ? {
+                ...current,
+                name: insertAtCursor(current.name, current.cursor, value),
+                cursor: current.cursor + Array.from(value).length,
+              }
+            : current,
+        );
       }
       return;
     }
@@ -869,6 +1012,47 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
       }
       return;
     }
+    if (editingConfigSettingKey) {
+      if (key.escape) {
+        cancelEditConfigSetting();
+        return;
+      }
+      if (key.return) {
+        void saveConfigSetting();
+        return;
+      }
+      if (key.leftArrow) {
+        setConfigEditCursor((current: number) => Math.max(0, current - 1));
+        return;
+      }
+      if (key.rightArrow) {
+        setConfigEditCursor((current: number) =>
+          Math.min(Array.from(configEditValue).length, current + 1),
+        );
+        return;
+      }
+      if (key.backspace) {
+        setConfigEditValue((current: string) => {
+          const next = removeAtCursor(current, configEditCursor, "backward");
+          setConfigEditCursor((cursor: number) => Math.max(0, cursor - 1));
+          return next;
+        });
+        return;
+      }
+      if (key.delete) {
+        setConfigEditValue((current: string) =>
+          removeAtCursor(current, configEditCursor, "forward"),
+        );
+        return;
+      }
+      if (!key.ctrl && value) {
+        setConfigEditValue((current: string) =>
+          insertAtCursor(current, configEditCursor, value),
+        );
+        setConfigEditCursor((current: number) => current + Array.from(value).length);
+      }
+      return;
+    }
     if (editingProviderConfig) {
       if (editingProviderConfigSettingKey) {
         if (key.escape) {
@@ -1080,6 +1264,29 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
         return;
       }
     }
+      if (key.escape && activeView === "config") {
+        if (configPane === "settings") {
+        setConfigPane(configBackPane());
+        return;
+      }
+      if (configPane === "groups") {
+        setConfigPane("tabs");
+        return;
+      }
+      if (configPane === "fileActions") {
+        setConfigPane("fileDialog");
+        return;
+      }
+      if (configPane === "fileDialog") {
+        setConfigPane("fileButton");
+        setConfigTab("normal");
+        return;
+      }
+      if (configPane === "fileButton") {
+        setConfigPane("tabs");
+        return;
+      }
+    }
     if (key.tab) {
       setActiveView((current) => nextMainView(current));
       return;
@@ -1100,10 +1307,67 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
       if (activeView === "agents" && pendingPersonaDeleteId) {
         setPendingPersonaDeleteId(null);
       }
+      if (activeView === "config" && pendingConfigDeleteId) {
+        setPendingConfigDeleteId(null);
+      }
       if (activeView === "console") {
         setConsoleScrollOffset((current) =>
           clampScrollOffset(current + 3, maxConsoleScrollOffset),
         );
+        return;
+      }
+      if (activeView === "config") {
+        if (loadingConfig || savingConfig) {
+          return;
+        }
+        if (configPane === "tabs") {
+          return;
+        }
+        if (configPane === "fileButton") {
+          setConfigPane("tabs");
+          return;
+        }
+        if (configPane === "settings") {
+          const groupSettings = currentConfigGroupSettings();
+          const groupIndex = Math.max(0, groupSettings.indexOf(selectedConfigSettingIndex));
+          if (groupIndex <= 0) {
+            setConfigPane(configBackPane());
+            return;
+          }
+          setSelectedConfigSettingIndex(groupSettings[groupIndex - 1] ?? selectedConfigSettingIndex);
+          return;
+        }
+        if (configPane === "groups") {
+          if (selectedConfigGroupIndex <= 0) {
+            setConfigPane("tabs");
+            return;
+          }
+          setSelectedConfigGroupIndex((current: number) => {
+            const next = Math.max(0, current - 1);
+            selectConfigGroupFirstSetting(next);
+            return next;
+          });
+          return;
+        }
+        if (configPane === "fileActions") {
+          setConfigPane("fileDialog");
+          return;
+        }
+        if (configPane === "fileDialog") {
+          if (selectedAbconfIndex <= 0) {
+            setConfigPane("fileActions");
+            return;
+          }
+          setSelectedAbconfIndex((current: number) => Math.max(0, current - 1));
+          selectConfigGroupFirstSetting(0);
+          return;
+        }
+        if (selectedAbconfIndex <= 0) {
+          setConfigPane("tabs");
+          return;
+        }
+        setSelectedAbconfIndex((current: number) => Math.max(0, current - 1));
+        selectConfigGroupFirstSetting(0);
         return;
       }
       if (activeView === "plugins") {
@@ -1170,14 +1434,18 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
           setSelectedAgentFieldIndex((current) => Math.max(0, current - 1));
           return;
         }
-        if (selectedAgentAction === "new") {
-          return;
-        }
-        if (selectedPersonaIndex <= 0) {
+        if (selectedAgentAction === "newFolder") {
           setSelectedAgentAction("new");
           return;
         }
-        setSelectedPersonaIndex((current) => Math.max(0, current - 1));
+        if (selectedAgentAction === "new") {
+          return;
+        }
+        if (selectedAgentEntryIndex <= 0) {
+          setSelectedAgentAction("new");
+          return;
+        }
+        setSelectedAgentEntryIndex((current) => Math.max(0, current - 1));
         setSelectedAgentAction(isEditingPersona ? "save" : "delete");
         setSelectedAgentFieldIndex(0);
         return;
@@ -1295,10 +1563,56 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
       if (activeView === "agents" && pendingPersonaDeleteId) {
         setPendingPersonaDeleteId(null);
       }
+      if (activeView === "config" && pendingConfigDeleteId) {
+        setPendingConfigDeleteId(null);
+      }
       if (activeView === "console") {
         setConsoleScrollOffset((current) =>
           clampScrollOffset(current - 3, maxConsoleScrollOffset),
         );
+        return;
+      }
+      if (activeView === "config") {
+        if (loadingConfig || savingConfig) {
+          return;
+        }
+        if (configPane === "tabs") {
+          setConfigPane(configDetailPane());
+          setSelectedConfigGroupIndex(0);
+          selectConfigGroupFirstSetting(0);
+          return;
+        }
+        if (configPane === "fileButton") {
+          setConfigPane("fileDialog");
+          return;
+        }
+        if (configPane === "fileActions") {
+          setConfigPane("fileDialog");
+          return;
+        }
+        if (configPane === "settings") {
+          const groupSettings = currentConfigGroupSettings();
+          const groupIndex = Math.max(0, groupSettings.indexOf(selectedConfigSettingIndex));
+          setSelectedConfigSettingIndex(
+            groupSettings[Math.min(Math.max(0, groupSettings.length - 1), groupIndex + 1)] ??
+              selectedConfigSettingIndex,
+          );
+          return;
+        }
+        if (configPane === "groups") {
+          setSelectedConfigGroupIndex((current: number) => {
+            const next = Math.min(Math.max(0, selectedConfigGroups.length - 1), current + 1);
+            selectConfigGroupFirstSetting(next);
+            return next;
+          });
+          return;
+        }
+        if (configPane === "fileDialog") {
+          setSelectedAbconfIndex((current: number) =>
+            Math.min(Math.max(0, abconfs.length - 1), current + 1),
+          );
+          selectConfigGroupFirstSetting(0);
+        }
         return;
       }
       if (activeView === "plugins") {
@@ -1369,14 +1683,18 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
           return;
         }
         if (selectedAgentAction === "new") {
-          if (!personas.length) {
+          setSelectedAgentAction("newFolder");
+          return;
+        }
+        if (selectedAgentAction === "newFolder") {
+          if (!agentEntries.length) {
             return;
           }
           setSelectedAgentAction(isEditingPersona ? "save" : "delete");
           return;
         }
-        setSelectedPersonaIndex((current) =>
-          Math.min(Math.max(0, personas.length - 1), current + 1),
+        setSelectedAgentEntryIndex((current) =>
+          Math.min(Math.max(0, agentEntries.length - 1), current + 1),
         );
         setSelectedAgentAction(isEditingPersona ? "save" : "delete");
         setSelectedAgentFieldIndex(0);
@@ -1511,10 +1829,69 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
       if (activeView === "agents" && pendingPersonaDeleteId) {
         setPendingPersonaDeleteId(null);
       }
+      if (activeView === "config" && pendingConfigDeleteId) {
+        setPendingConfigDeleteId(null);
+      }
       if (activeView === "commands") {
         setComponentsView((current) =>
           current === "commands" ? "tools" : "commands",
         );
+      } else if (activeView === "config") {
+        if (loadingConfig || savingConfig) {
+          return;
+        }
+        if (configPane === "tabs") {
+          if (key.leftArrow && configTab === "normal") {
+            return;
+          }
+          if (key.rightArrow && configTab === "normal") {
+            setConfigTab("system");
+            setSelectedConfigGroupIndex(0);
+            selectConfigGroupFirstSetting(0);
+          } else if (key.rightArrow && configTab === "system") {
+            setConfigPane("fileButton");
+            setConfigTab("normal");
+          } else if (key.leftArrow && configTab === "system") {
+            setConfigTab("normal");
+            setSelectedConfigGroupIndex(0);
+            selectConfigGroupFirstSetting(0);
+          } else {
+            setConfigPane("tabs");
+          }
+        } else if (configPane === "fileButton") {
+          if (key.leftArrow) {
+            setConfigPane("tabs");
+            setConfigTab("system");
+          } else {
+            return;
+          }
+        } else if (configPane === "fileActions") {
+          const actions = ["new", "copy", "rename", "delete"] as const;
+          setSelectedConfigFileAction((current: typeof actions[number]) => {
+            const index = Math.max(0, actions.indexOf(current));
+            const nextIndex = key.leftArrow
+              ? Math.max(0, index - 1)
+              : Math.min(actions.length - 1, index + 1);
+            return actions[nextIndex];
+          });
+        } else if (configPane === "fileDialog") {
+          if (key.leftArrow) {
+            setConfigPane("fileButton");
+            setConfigTab("normal");
+          } else {
+            setConfigPane(configDetailPane());
+            setSelectedConfigGroupIndex(0);
+            selectConfigGroupFirstSetting(0);
+          }
+        } else if (configPane === "groups") {
+          if (key.leftArrow) {
+            setConfigPane("tabs");
+          } else {
+            setConfigPane("settings");
+          }
+        } else if (configPane === "settings") {
+          setConfigPane(configBackPane());
+        }
       } else if (activeView === "plugins") {
         if (pluginPane === "tabs") {
           if (pluginTab === "market" && key.rightArrow) {
@@ -1582,16 +1959,26 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
             setSelectedAgentAction(isEditingPersona ? "save" : "delete");
           }
         } else if (selectedAgentAction === "new") {
-          if (key.rightArrow && personas.length) {
-            if (isEditingPersona) {
-              setSelectedAgentAction("save");
-            } else {
-              void beginEditSelectedPersona();
-            }
+          if (key.rightArrow) {
+            setSelectedAgentAction("newFolder");
           }
-        } else if (key.rightArrow && !isEditingPersona) {
+        } else if (selectedAgentAction === "newFolder") {
+          if (key.leftArrow) {
+            setSelectedAgentAction("new");
+          } else if (agentEntries.length) {
+            setSelectedAgentAction(isEditingPersona ? "save" : "delete");
+          }
+        } else if (
+          key.rightArrow &&
+          !isEditingPersona &&
+          selectedAgentEntry?.type === "persona"
+        ) {
           void beginEditSelectedPersona();
-        } else if (key.rightArrow && selectedAgentAction === selectedAgentActions[selectedAgentActions.length - 1]) {
+        } else if (
+          key.rightArrow &&
+          selectedAgentEntry?.type === "persona" &&
+          selectedAgentAction === selectedAgentActions[selectedAgentActions.length - 1]
+        ) {
           setAgentPane("fields");
           setSelectedAgentFieldIndex(0);
         } else {
@@ -1758,6 +2145,22 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
             Math.max(0, current - Math.max(1, layout.bodyHeight - 4)),
           );
         }
+      } else if (activeView === "config") {
+        const jump = Math.max(1, layout.bodyHeight - 7);
+        if (configPane === "settings") {
+          const groupSettings = currentConfigGroupSettings();
+          const groupIndex = Math.max(0, groupSettings.indexOf(selectedConfigSettingIndex));
+          setSelectedConfigSettingIndex(groupSettings[Math.max(0, groupIndex - jump)] ?? selectedConfigSettingIndex);
+        } else if (configPane === "groups") {
+          const next = Math.max(0, selectedConfigGroupIndex - jump);
+          setSelectedConfigGroupIndex(next);
+          selectConfigGroupFirstSetting(next);
+        } else if (configPane === "fileDialog") {
+          setSelectedAbconfIndex((current: number) =>
+            Math.max(0, current - jump),
+          );
+          selectConfigGroupFirstSetting(0);
+        }
       } else if (activeView === "plugins") {
         if (pluginPane === "tabs") {
           return;
@@ -1808,10 +2211,12 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
           setSelectedAgentFieldIndex((current) =>
             Math.max(0, current - Math.max(1, layout.bodyHeight - 5)),
           );
+        } else if (selectedAgentAction === "newFolder") {
+          setSelectedAgentAction("new");
         } else if (selectedAgentAction === "new") {
           return;
         } else {
-          setSelectedPersonaIndex((current) =>
+          setSelectedAgentEntryIndex((current) =>
             Math.max(0, current - Math.max(1, layout.bodyHeight - 5)),
           );
           setSelectedAgentAction(isEditingPersona ? "save" : "delete");
@@ -1899,6 +2304,33 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
             ),
           );
         }
+      } else if (activeView === "config") {
+        const jump = Math.max(1, layout.bodyHeight - 7);
+        if (configPane === "tabs") {
+          setConfigPane(configDetailPane());
+          setSelectedConfigGroupIndex(0);
+          selectConfigGroupFirstSetting(0);
+        } else if (configPane === "settings") {
+          const groupSettings = currentConfigGroupSettings();
+          const groupIndex = Math.max(0, groupSettings.indexOf(selectedConfigSettingIndex));
+          setSelectedConfigSettingIndex(
+            groupSettings[Math.min(Math.max(0, groupSettings.length - 1), groupIndex + jump)] ??
+              selectedConfigSettingIndex,
+          );
+        } else if (configPane === "groups") {
+          const next = Math.min(Math.max(0, selectedConfigGroups.length - 1), selectedConfigGroupIndex + jump);
+          setSelectedConfigGroupIndex(next);
+          selectConfigGroupFirstSetting(next);
+        } else if (configPane === "fileActions") {
+          setConfigPane("fileDialog");
+        } else if (configPane === "fileDialog") {
+          setSelectedAbconfIndex((current: number) =>
+            Math.min(Math.max(0, abconfs.length - 1), current + jump),
+          );
+          selectConfigGroupFirstSetting(0);
+        } else if (configPane === "fileButton") {
+          setConfigPane("fileDialog");
+        }
       } else if (activeView === "plugins") {
         if (pluginPane === "tabs") {
           setPluginPane(pluginTab === "market" ? "market" : "list");
@@ -1969,13 +2401,13 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
             ),
           );
         } else if (selectedAgentAction === "new") {
-          if (personas.length) {
-            setSelectedAgentAction(isEditingPersona ? "save" : "delete");
-          }
+          setSelectedAgentAction("newFolder");
+        } else if (selectedAgentAction === "newFolder") {
+          setSelectedAgentAction(isEditingPersona ? "save" : "delete");
         } else {
-          setSelectedPersonaIndex((current) =>
+          setSelectedAgentEntryIndex((current) =>
             Math.min(
-              Math.max(0, personas.length - 1),
+              Math.max(0, agentEntries.length - 1),
               current + Math.max(1, layout.bodyHeight - 5),
             ),
           );
@@ -2076,6 +2508,29 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
             beginEditAgentField();
           } else {
             void executeSelectedAgentAction();
+          }
+        }
+        if (activeView === "config") {
+          if (loadingConfig || savingConfig) {
+            return;
+          }
+          if (configPane === "tabs") {
+            setConfigPane(configDetailPane());
+            setSelectedConfigGroupIndex(0);
+            selectConfigGroupFirstSetting(0);
+          } else if (configPane === "fileActions") {
+            void executeSelectedConfigFileAction();
+          } else if (configPane === "fileDialog") {
+            void loadNormalConfig(abconfs[selectedAbconfIndex] || null);
+            setConfigPane(configDetailPane());
+            setSelectedConfigGroupIndex(0);
+            selectConfigGroupFirstSetting(0);
+          } else if (configPane === "fileButton") {
+            setConfigPane("fileDialog");
+          } else if (configPane === "groups") {
+            setConfigPane("settings");
+          } else {
+            beginEditConfigSetting();
           }
         }
         if (activeView === "providers") {

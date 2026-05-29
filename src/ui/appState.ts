@@ -3,7 +3,10 @@ import type {
   ChatRecord,
   ChatSession,
   CommandItem,
+  AbconfInfo,
   LiveLogPayload,
+  AstrBotConfigPayload,
+  PersonaFolder,
   PersonaItem,
   PlatformConfig,
   PlatformRuntimeStat,
@@ -43,6 +46,9 @@ import type {
   PendingPlatformDelete,
   PendingProviderDelete,
   PlatformRegistrationFlow,
+  ConfigFileActionDialogState,
+  ConfigPane,
+  ConfigTab,
   PluginConfigChoiceDialogState,
   PluginConfigTemplateListDialogState,
   PluginFileDialogState,
@@ -244,6 +250,10 @@ export function usePluginsState() {
 }
 
 export function useAgentsState() {
+  const [personaFolders, setPersonaFolders] = useState<PersonaFolder[]>([]);
+  const [personaFolderTree, setPersonaFolderTree] = useState<PersonaFolder[]>([]);
+  const [currentPersonaFolderId, setCurrentPersonaFolderId] = useState<string | null>(null);
+  const [selectedAgentEntryIndex, setSelectedAgentEntryIndex] = useState(0);
   const [personas, setPersonas] = useState<PersonaItem[]>([]);
   const [selectedPersonaIndex, setSelectedPersonaIndex] = useState(0);
   const [agentPane, setAgentPane] = useState<AgentPane>("list");
@@ -258,7 +268,16 @@ export function useAgentsState() {
   const [editingAgentFieldKey, setEditingAgentFieldKey] = useState<AgentField["key"] | null>(null);
   const [agentEditValue, setAgentEditValue] = useState("");
   const [agentEditCursor, setAgentEditCursor] = useState(0);
+  const [creatingPersonaFolder, setCreatingPersonaFolder] = useState<ConfigFileActionDialogState | null>(null);
   return {
+    personaFolders,
+    setPersonaFolders,
+    personaFolderTree,
+    setPersonaFolderTree,
+    currentPersonaFolderId,
+    setCurrentPersonaFolderId,
+    selectedAgentEntryIndex,
+    setSelectedAgentEntryIndex,
     personas,
     setPersonas,
     selectedPersonaIndex,
@@ -285,6 +304,63 @@ export function useAgentsState() {
     setAgentEditValue,
     agentEditCursor,
     setAgentEditCursor,
+    creatingPersonaFolder,
+    setCreatingPersonaFolder,
+  };
+}
+
+export function useConfigState() {
+  const [configTab, setConfigTab] = useState<ConfigTab>("normal");
+  const [configPane, setConfigPane] = useState<ConfigPane>("tabs");
+  const [abconfs, setAbconfs] = useState<AbconfInfo[]>([]);
+  const [selectedAbconfIndex, setSelectedAbconfIndex] = useState(0);
+  const [selectedConfigFileAction, setSelectedConfigFileAction] =
+    useState<"new" | "copy" | "rename" | "delete">("new");
+  const [normalConfigPayload, setNormalConfigPayload] = useState<AstrBotConfigPayload | null>(null);
+  const [systemConfigPayload, setSystemConfigPayload] = useState<AstrBotConfigPayload | null>(null);
+  const [selectedConfigGroupIndex, setSelectedConfigGroupIndex] = useState(0);
+  const [selectedConfigSettingIndex, setSelectedConfigSettingIndex] = useState(0);
+  const [editingConfigSettingKey, setEditingConfigSettingKey] = useState<string | null>(null);
+  const [configEditValue, setConfigEditValue] = useState("");
+  const [configEditCursor, setConfigEditCursor] = useState(0);
+  const [loadingConfig, setLoadingConfig] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [configFileActionDialog, setConfigFileActionDialog] =
+    useState<ConfigFileActionDialogState | null>(null);
+  const [pendingConfigDeleteId, setPendingConfigDeleteId] = useState<string | null>(null);
+  return {
+    configTab,
+    setConfigTab,
+    configPane,
+    setConfigPane,
+    abconfs,
+    setAbconfs,
+    selectedAbconfIndex,
+    setSelectedAbconfIndex,
+    selectedConfigFileAction,
+    setSelectedConfigFileAction,
+    normalConfigPayload,
+    setNormalConfigPayload,
+    systemConfigPayload,
+    setSystemConfigPayload,
+    selectedConfigGroupIndex,
+    setSelectedConfigGroupIndex,
+    selectedConfigSettingIndex,
+    setSelectedConfigSettingIndex,
+    editingConfigSettingKey,
+    setEditingConfigSettingKey,
+    configEditValue,
+    setConfigEditValue,
+    configEditCursor,
+    setConfigEditCursor,
+    loadingConfig,
+    setLoadingConfig,
+    savingConfig,
+    setSavingConfig,
+    configFileActionDialog,
+    setConfigFileActionDialog,
+    pendingConfigDeleteId,
+    setPendingConfigDeleteId,
   };
 }
 
@@ -436,5 +512,6 @@ export type StatusState = ReturnType<typeof useStatusState>;
 export type CommandsState = ReturnType<typeof useCommandsState>;
 export type PluginsState = ReturnType<typeof usePluginsState>;
 export type AgentsState = ReturnType<typeof useAgentsState>;
+export type ConfigState = ReturnType<typeof useConfigState>;
 export type PlatformsState = ReturnType<typeof usePlatformsState>;
 export type ProvidersState = ReturnType<typeof useProvidersState>;

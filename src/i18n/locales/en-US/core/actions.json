@@ -11,6 +11,7 @@
   "backup": "Backup",
   "restore": "Restore",
   "copy": "Copy",
+  "rename": "Rename",
   "paste": "Paste",
   "cut": "Cut",
   "undo": "Undo",

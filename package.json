@@ -2,6 +2,15 @@
   "name": "astr-tui",
   "version": "0.1.0",
   "description": "Terminal workbench for AstrBot Dashboard",
+  "license": "MIT",
+  "keywords": [
+    "astrbot",
+    "dashboard",
+    "terminal",
+    "tui",
+    "cli",
+    "ink"
+  ],
   "type": "module",
   "bin": {
     "astr-tui": "./dist/cli/index.js"
@@ -12,6 +21,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node -e \"const fs=require('fs'); fs.cpSync('src/i18n/locales','dist/i18n/locales',{recursive:true});\"",
     "dev": "tsx src/cli/index.tsx",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

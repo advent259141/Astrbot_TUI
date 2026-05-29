@@ -11,6 +11,7 @@
   "backup": "备份",
   "restore": "恢复",
   "copy": "复制",
+  "rename": "重命名",
   "paste": "粘贴",
   "cut": "剪切",
   "undo": "撤销",

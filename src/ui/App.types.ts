@@ -1,4 +1,5 @@
 import type {
+  AbconfInfo,
   PlatformConfig,
   ProviderConfig,
   ProviderSourceConfig,
@@ -15,6 +16,7 @@ export type MainView =
   | "commands"
   | "plugins"
   | "agents"
+  | "config"
   | "providers"
   | "platforms";
 
@@ -36,6 +38,22 @@ export interface ProviderTemplate {
 }
 
 export interface ProviderConfigSetting extends PluginConfigSetting {}
+
+export type ConfigTab = "normal" | "system";
+export type ConfigPane = "tabs" | "fileButton" | "fileDialog" | "fileActions" | "groups" | "settings";
+
+export interface AstrBotConfigSetting extends PluginConfigSetting {
+  groupKey?: string;
+  sectionKey?: string;
+  isSection?: boolean;
+}
+
+export interface ConfigFileActionDialogState {
+  mode: "create" | "rename" | "copy" | "folder";
+  config?: AbconfInfo;
+  name: string;
+  cursor: number;
+}
 
 export interface PlatformRegistrationFlow {
   templateIndex?: number;
@@ -118,6 +136,7 @@ export const MAIN_VIEWS: MainView[] = [
   "commands",
   "plugins",
   "agents",
+  "config",
   "providers",
   "platforms",
 ];

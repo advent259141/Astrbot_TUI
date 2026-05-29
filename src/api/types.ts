@@ -247,6 +247,26 @@ export interface AstrBotConfigPayload {
   [key: string]: unknown;
 }
 
+export interface AbconfInfo {
+  id: string;
+  name?: string;
+  path?: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+  [key: string]: unknown;
+}
+
+export interface AbconfListPayload {
+  info_list?: AbconfInfo[];
+  [key: string]: unknown;
+}
+
+export interface AbconfMutationPayload {
+  conf_id?: string;
+  message?: string;
+  [key: string]: unknown;
+}
+
 export interface PlatformListPayload {
   platforms: PlatformConfig[];
 }
@@ -277,6 +297,24 @@ export interface PersonaItem {
   sort_order?: number;
   created_at?: string | null;
   updated_at?: string | null;
+  [key: string]: unknown;
+}
+
+export interface PersonaFolder {
+  folder_id: string;
+  name: string;
+  parent_id?: string | null;
+  description?: string | null;
+  sort_order?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  children?: PersonaFolder[];
+  [key: string]: unknown;
+}
+
+export interface PersonaFolderMutationPayload {
+  message?: string;
+  folder?: PersonaFolder;
   [key: string]: unknown;
 }
 

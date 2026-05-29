@@ -42,8 +42,7 @@
     "advanced": "Advanced Settings",
     "security": "Security Settings",
     "appearance": "Appearance Settings",
-    "notification": "Notification Settings",
-    "moreConfig": "More Settings"
+    "notification": "Notification Settings"
   },
   "general": {
     "botName": "Bot Name",
@@ -80,6 +79,7 @@
     "newConfig": "New Configuration",
     "copyConfig": "Copy Configuration",
     "editConfig": "Edit Configuration",
+    "renameConfig": "Rename Configuration",
     "manageConfigs": "Manage Configurations...",
     "configName": "Name",
     "fillConfigName": "Enter configuration name",

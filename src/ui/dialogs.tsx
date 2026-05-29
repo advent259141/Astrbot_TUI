@@ -20,6 +20,7 @@ import {
 } from "./dialogControls.js";
 import {
   type PendingMarketInstallWarning,
+  type ConfigFileActionDialogState,
   type PlatformRegistrationFlow,
   type PluginConfigChoiceDialogState,
   type PluginConfigTemplateListDialogState,
@@ -136,6 +137,121 @@ export function MarketSearchDialog({
   );
 }
 
+export function ConfigFileActionDialog({
+  columns,
+  rows,
+  dialog,
+  saving,
+  i18n,
+}: {
+  columns: number;
+  rows: number;
+  dialog: ConfigFileActionDialogState;
+  saving: boolean;
+  i18n: I18n;
+}) {
+  const width = Math.max(40, Math.min(76, columns - 8));
+  const contentWidth = Math.max(20, width - 4);
+  const top = Math.max(2, Math.floor((rows - 7) / 2));
+  const leftPad = Math.max(0, Math.floor((columns - width) / 2));
+  const rightPad = Math.max(0, columns - width - leftPad);
+  const spacer = " ".repeat(leftPad);
+  const tail = " ".repeat(rightPad);
+  const border = `+${"-".repeat(Math.max(0, width - 2))}+`;
+  const status = saving
+    ? i18n.t("tui.common.saving", "saving")
+    : i18n.t("tui.keys.enterSaveEscCancel", "Enter save  Esc cancel");
+  const statusText = truncateCells(status, Math.max(1, Math.floor(contentWidth / 2)));
+  const titleWidth = Math.max(1, contentWidth - terminalWidth(statusText));
+  const title = dialog.mode === "create"
+    ? i18n.t("features.config.configManagement.newConfig", "Create Config")
+    : dialog.mode === "folder"
+      ? i18n.t("features.persona.folder.createButton", "Create Folder")
+      : dialog.mode === "copy"
+      ? i18n.t("features.config.configManagement.copyConfig", "Copy Config")
+      : i18n.t("features.config.configManagement.renameConfig", "Rename Config");
+  const titleLine = `${padRightCells(title, titleWidth)}${statusText}`;
+  const source = dialog.config
+    ? `${dialog.config.name || dialog.config.id} (${dialog.config.id})`
+    : i18n.t("tui.common.none", "N/A");
+
+  return (
+    <Box
+      position="absolute"
+      width={columns}
+      height={7}
+      marginTop={top}
+      flexDirection="column"
+    >
+      <DialogTextLine color={saving ? "yellow" : "cyan"} left={spacer} right={tail} text={border} />
+      <DialogContentLine
+        borderColor={saving ? "yellow" : "cyan"}
+        color={saving ? "yellow" : "cyan"}
+        left={spacer}
+        right={tail}
+        content={titleLine}
+        width={contentWidth}
+        bold
+      />
+      {dialog.mode === "copy" || dialog.mode === "rename" ? (
+        <DialogContentLine
+          borderColor={saving ? "yellow" : "cyan"}
+          color="gray"
+          left={spacer}
+          right={tail}
+          content={`${i18n.t("tui.config.source", "Source")}  ${source}`}
+          width={contentWidth}
+        />
+      ) : dialog.mode === "folder" ? (
+        <DialogContentLine
+          borderColor={saving ? "yellow" : "cyan"}
+          color="gray"
+          left={spacer}
+          right={tail}
+          content={i18n.t("features.persona.folder.createDialog.title", "Create a folder in the current folder.")}
+          width={contentWidth}
+        />
+      ) : (
+        <DialogContentLine
+          borderColor={saving ? "yellow" : "cyan"}
+          color="gray"
+          left={spacer}
+          right={tail}
+          content={i18n.t("tui.config.newConfigHint", "Create from default config.")}
+          width={contentWidth}
+        />
+      )}
+      <DialogContentLine
+        borderColor={saving ? "yellow" : "cyan"}
+        color="gray"
+        left={spacer}
+        right={tail}
+        content={i18n.t("core.common.name", "Name")}
+        width={contentWidth}
+      />
+      <DialogInputLine
+        borderColor={saving ? "yellow" : "cyan"}
+        left={spacer}
+        right={tail}
+        value={dialog.name}
+        cursor={dialog.cursor}
+        width={contentWidth}
+      />
+      <DialogContentLine
+        borderColor={saving ? "yellow" : "cyan"}
+        color="gray"
+        left={spacer}
+        right={tail}
+        content={dialog.mode === "folder"
+          ? i18n.t("features.persona.folder.form.name", "Folder name")
+          : i18n.t("tui.config.nameHint", "Use a short name shown in the config list.")}
+        width={contentWidth}
+      />
+      <DialogTextLine color={saving ? "yellow" : "cyan"} left={spacer} right={tail} text={border} />
+    </Box>
+  );
+}
+
 export function PluginInstallWarningDialog({
   columns,
   rows,
@@ -222,6 +338,7 @@ export function PluginConfigSettingDialog({
   value,
   cursor,
   saving,
+  title,
 }: {
   columns: number;
   rows: number;
@@ -230,6 +347,7 @@ export function PluginConfigSettingDialog({
   value: string;
   cursor: number;
   saving: boolean;
+  title?: string;
 }) {
   const width = Math.max(36, Math.min(76, columns - 8));
   const contentWidth = Math.max(20, width - 4);
@@ -237,8 +355,12 @@ export function PluginConfigSettingDialog({
   const options = pluginConfigOptionsLabel(setting, i18n);
   const hint = String(setting.hint || "").trim();
   const details = [
-    `Field  ${setting.path.join(".") || setting.key}`,
-    `Type   ${pluginConfigDialogType(setting)}`,
+    i18n.t("tui.pluginConfig.field", "Field  {name}", {
+      name: setting.path.join(".") || setting.key,
+    }),
+    i18n.t("tui.pluginConfig.typeLine", "Type   {type}", {
+      type: pluginConfigDialogType(setting, i18n),
+    }),
     options ? `${i18n.t("tui.pluginConfig.options", "Options")}  ${options}` : "",
     hint ? `${i18n.t("tui.pluginConfig.hint", "Hint")}   ${hint}` : "",
     i18n.t("tui.pluginConfig.current", "Current  {value}", {
@@ -257,7 +379,7 @@ export function PluginConfigSettingDialog({
     : i18n.t("tui.keys.enterSaveEscCancel", "Enter save  Esc cancel");
   const statusText = truncateCells(status, Math.max(1, Math.floor(contentWidth / 2)));
   const titleWidth = Math.max(1, contentWidth - terminalWidth(statusText));
-  const titleLine = `${padRightCells(i18n.t("tui.pluginConfig.editPluginConfig", "Edit Plugin Config"), titleWidth)}${statusText}`;
+  const titleLine = `${padRightCells(title || i18n.t("tui.pluginConfig.editPluginConfig", "Edit Plugin Config"), titleWidth)}${statusText}`;
 
   return (
     <Box
@@ -682,7 +804,9 @@ export function PluginObjectEditorDialog({
             color="gray"
             left={spacer}
             right={tail}
-            content={`Type  ${editor.newValueType}`}
+            content={i18n.t("tui.pluginConfig.typeLine", "Type   {type}", {
+              type: editor.newValueType,
+            })}
             width={contentWidth}
           />
           <DialogInputLine
@@ -814,13 +938,15 @@ export function PluginFileDialog({
   );
 }
 
-export function pluginConfigDialogType(setting: PluginConfigSetting): string {
+export function pluginConfigDialogType(setting: PluginConfigSetting, i18n?: I18n): string {
   const baseType = String(setting.schema?.type || inferPluginConfigValueType(setting.value));
   if (setting.schema?._special) {
     return `${baseType} (${setting.schema._special})`;
   }
   if (setting.schema?.editor_mode) {
-    return `${baseType} editor`;
+    return i18n
+      ? i18n.t("tui.pluginConfig.editorType", "{type} editor", { type: baseType })
+      : `${baseType} editor`;
   }
   return baseType;
 }
@@ -1598,7 +1724,7 @@ export function ProviderConfigDialog({
           const label = setting.depth > 0
             ? `${"  ".repeat(setting.depth)}${setting.label || setting.key}`
             : setting.label || setting.key;
-          const typeLabel = pluginConfigDialogType(setting);
+          const typeLabel = pluginConfigDialogType(setting, i18n);
           const keyText = padRightCells(truncateCells(label, keyWidth), keyWidth);
           const valueWidth = Math.max(1, contentWidth - terminalWidth(marker) - keyWidth);
           const valueText = [

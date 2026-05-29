@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { PersonaItem } from "../api/types.js";
+import type { PersonaFolder, PersonaItem } from "../api/types.js";
 import type { I18n } from "../i18n/index.js";
 import {
   padRightCells,
@@ -9,7 +9,7 @@ import {
 } from "./terminal.js";
 
 export type AgentPane = "list" | "fields" | "actions";
-export type AgentAction = "new" | "save" | "cancel" | "delete";
+export type AgentAction = "new" | "newFolder" | "save" | "cancel" | "delete";
 export type AgentFieldKey =
   | "persona_id"
   | "system_prompt"
@@ -26,13 +26,22 @@ export interface AgentField {
   hint?: string;
 }
 
+export type AgentListEntry =
+  | { type: "up"; id: ".."; label: string }
+  | { type: "folder"; id: string; folder: PersonaFolder }
+  | { type: "persona"; id: string; persona: PersonaItem; personaIndex: number };
+
 export interface AgentsViewProps {
   i18n?: I18n;
   width: number;
   personas: PersonaItem[];
-  visiblePersonas: PersonaItem[];
-  personaWindowStart: number;
-  selectedPersonaIndex: number;
+  folders: PersonaFolder[];
+  currentFolderName: string;
+  currentFolderPath: string;
+  entries: AgentListEntry[];
+  visibleEntries: AgentListEntry[];
+  entryWindowStart: number;
+  selectedEntryIndex: number;
   selectedAgentAction: AgentAction;
   selectedAgentFieldIndex: number;
   agentPane: AgentPane;
@@ -77,9 +86,13 @@ export function AgentsView({
   i18n,
   width,
   personas,
-  visiblePersonas,
-  personaWindowStart,
-  selectedPersonaIndex,
+  folders,
+  currentFolderName,
+  currentFolderPath,
+  entries,
+  visibleEntries,
+  entryWindowStart,
+  selectedEntryIndex,
   selectedAgentAction,
   selectedAgentFieldIndex,
   agentPane,
@@ -92,11 +105,12 @@ export function AgentsView({
 }: AgentsViewProps) {
   const listWidth = Math.max(48, Math.min(76, Math.floor(width * 0.48)));
   const detailWidth = Math.max(30, width - listWidth - 3);
-  const selectedPosition = personas.length
-    ? `${Math.min(selectedPersonaIndex + 1, personas.length)}/${personas.length}`
+  const selectedPosition = entries.length
+    ? `${Math.min(selectedEntryIndex + 1, entries.length)}/${entries.length}`
     : "0/0";
-  const meta = t(i18n, "tui.agents.meta", "{count} personas  {position}", {
+  const meta = t(i18n, "tui.agents.meta", "{count} personas  {folders} folders  {position}", {
     count: personas.length,
+    folders: folders.length,
     position: selectedPosition,
   });
 
@@ -115,40 +129,63 @@ export function AgentsView({
           paddingX={1}
         >
           <Box justifyContent="space-between">
-            <Text bold>{t(i18n, "features.persona.persona.personasTitle", "Personas")}</Text>
-            <Text
-              color={agentPane === "list" && selectedAgentAction === "new" ? "cyan" : "green"}
-              inverse={agentPane === "list" && selectedAgentAction === "new"}
-            >
-              {` ${t(i18n, "tui.common.new", "new")} `}
-            </Text>
+            <Text bold>{truncateCells(currentFolderName, Math.max(1, listWidth - 28))}</Text>
+            <Box>
+              <Text
+                color={agentPane === "list" && selectedAgentAction === "new" ? "cyan" : "green"}
+                inverse={agentPane === "list" && selectedAgentAction === "new"}
+              >
+                {` ${t(i18n, "tui.common.new", "new")} `}
+              </Text>
+              <Text> </Text>
+              <Text
+                color={agentPane === "list" && selectedAgentAction === "newFolder" ? "cyan" : "green"}
+                inverse={agentPane === "list" && selectedAgentAction === "newFolder"}
+              >
+                {` ${t(i18n, "features.persona.folder.createButton", "new folder")} `}
+              </Text>
+            </Box>
           </Box>
+          <Text dimColor>{truncateCells(currentFolderPath, listWidth - 4)}</Text>
           <Text dimColor>{personaHeader(listWidth - 4, i18n)}</Text>
-          {visiblePersonas.length ? (
-            visiblePersonas.map((persona, index) => {
-              const personaIndex = personaWindowStart + index;
-              const isCurrent = personaIndex === selectedPersonaIndex;
+          {visibleEntries.length ? (
+            visibleEntries.map((entry, index) => {
+              const entryIndex = entryWindowStart + index;
+              const isCurrent = entryIndex === selectedEntryIndex;
               const isSelected =
                 agentPane === "list" &&
                 selectedAgentAction !== "new" &&
+                selectedAgentAction !== "newFolder" &&
                 isCurrent;
+              if (entry.type === "persona") {
+                return (
+                  <PersonaRow
+                    key={`persona-${entry.persona.persona_id}`}
+                    persona={entry.persona}
+                    width={listWidth - 4}
+                    isSelected={isSelected}
+                    isCurrent={isCurrent}
+                    selectedAction={selectedAgentAction}
+                    isEditingAgent={isEditingAgent && isCurrent}
+                    isCreatingAgent={isCreatingAgent && isCurrent}
+                    working={workingPersonaId === entry.persona.persona_id}
+                    i18n={i18n}
+                  />
+                );
+              }
               return (
-                <PersonaRow
-                  key={persona.persona_id}
-                  persona={persona}
+                <FolderRow
+                  key={`${entry.type}-${entry.id}`}
+                  entry={entry}
                   width={listWidth - 4}
                   isSelected={isSelected}
                   isCurrent={isCurrent}
-                  selectedAction={selectedAgentAction}
-                  isEditingAgent={isEditingAgent && isCurrent}
-                  isCreatingAgent={isCreatingAgent && isCurrent}
-                  working={workingPersonaId === persona.persona_id}
                   i18n={i18n}
                 />
               );
             })
           ) : (
-            <Text dimColor>{t(i18n, "features.persona.empty.description", "Create your first persona to start using personalized chatbots")}</Text>
+            <Text dimColor>{t(i18n, "features.persona.empty.folderEmptyDescription", "This folder is empty.")}</Text>
           )}
         </Box>
         <Box width={3}>
@@ -199,6 +236,7 @@ export function AgentsView({
           agentFooterLine({
             agentPane,
             selectedAgentAction,
+            selectedEntry: entries[selectedEntryIndex],
             selectedPersona,
             selectedField: agentFields[selectedAgentFieldIndex],
             isEditingAgent,
@@ -275,6 +313,45 @@ function PersonaRow({
       </Text>
       <Text color={dangerAction === "delete" ? "red" : "yellow"} inverse={dangerSelected}>
         {padRightCells(truncateCells(dangerAction === "delete" ? "X" : dangerLabel, ACTION_WIDTH), ACTION_WIDTH)}
+      </Text>
+    </Box>
+  );
+}
+
+function FolderRow({
+  entry,
+  width,
+  isSelected,
+  isCurrent,
+  i18n,
+}: {
+  entry: Extract<AgentListEntry, { type: "folder" | "up" }>;
+  width: number;
+  isSelected: boolean;
+  isCurrent: boolean;
+  i18n?: I18n;
+}) {
+  const layout = personaTableLayout(width);
+  const marker = `${isSelected ? ">" : " "} `;
+  const label = entry.type === "up" ? entry.label : entry.folder.name;
+  const meta = entry.type === "up"
+    ? t(i18n, "tui.agents.folder.parent", "parent")
+    : t(i18n, "features.persona.folder.foldersTitle", "Folder");
+  const id = entry.type === "up" ? ".." : entry.folder.folder_id;
+  return (
+    <Box width={width}>
+      <Text color={isSelected ? "cyan" : isCurrent ? "green" : undefined}>{marker}</Text>
+      <Text color={entry.type === "up" ? "gray" : "yellow"}>
+        {padRightCells(entry.type === "up" ? ".." : "dir", STATE_WIDTH)}
+      </Text>
+      <Text color={isSelected ? "cyan" : "yellow"}>
+        {padRightCells(truncateCells(label, layout.nameWidth), layout.nameWidth)}
+      </Text>
+      <Text color="gray">
+        {padRightCells(truncateCells(meta, COUNT_WIDTH), COUNT_WIDTH)}
+      </Text>
+      <Text color="gray">
+        {padRightCells(truncateCells(id, COUNT_WIDTH + ACTION_WIDTH * 2), COUNT_WIDTH + ACTION_WIDTH * 2)}
       </Text>
     </Box>
   );
@@ -415,6 +492,7 @@ function agentModeLabel(
 function agentFooterLine({
   agentPane,
   selectedAgentAction,
+  selectedEntry,
   selectedPersona,
   selectedField,
   isEditingAgent,
@@ -424,6 +502,7 @@ function agentFooterLine({
 }: {
   agentPane: AgentPane;
   selectedAgentAction: AgentAction;
+  selectedEntry?: AgentListEntry;
   selectedPersona: PersonaItem | null;
   selectedField?: AgentField;
   isEditingAgent: boolean;
@@ -451,6 +530,17 @@ function agentFooterLine({
   }
   if (selectedAgentAction === "new") {
     return t(i18n, "tui.agents.footer.new", "Enter creates a draft persona.");
+  }
+  if (selectedAgentAction === "newFolder") {
+    return t(i18n, "tui.agents.footer.newFolder", "Enter creates a folder in the current folder.");
+  }
+  if (selectedEntry?.type === "folder") {
+    return t(i18n, "tui.agents.footer.openFolder", "{name}  Enter opens folder.", {
+      name: selectedEntry.folder.name,
+    });
+  }
+  if (selectedEntry?.type === "up") {
+    return t(i18n, "tui.agents.footer.parentFolder", "Enter returns to the parent folder.");
   }
   if (!selectedPersona) {
     return t(i18n, "tui.agents.selectPersona", "Select a persona.");

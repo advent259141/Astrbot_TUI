@@ -53,6 +53,7 @@ import {
   ChatView,
 } from "./ChatView.js";
 import { CommandsView } from "./CommandsView.js";
+import { ConfigView } from "./ConfigView.js";
 import { ConsoleView } from "./ConsoleView.js";
 import { PlatformsView } from "./PlatformsView.js";
 import { PluginsView } from "./PluginsView.js";
@@ -86,6 +87,7 @@ import {
   useAgentsState,
   useChatState,
   useCommandsState,
+  useConfigState,
   usePlatformsState,
   usePluginsState,
   useProvidersState,
@@ -126,6 +128,7 @@ import {
   ProviderCreateDialog,
   ProviderSourceCreateDialog,
   ProviderSourceSettingDialog,
+  ConfigFileActionDialog,
 } from "./dialogs.js";
 
 interface AppProps {
@@ -285,7 +288,51 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     setAgentEditValue,
     agentEditCursor,
     setAgentEditCursor,
+    personaFolders,
+    setPersonaFolders,
+    personaFolderTree,
+    setPersonaFolderTree,
+    currentPersonaFolderId,
+    setCurrentPersonaFolderId,
+    selectedAgentEntryIndex,
+    setSelectedAgentEntryIndex,
+    creatingPersonaFolder,
+    setCreatingPersonaFolder,
   } = useAgentsState();
+  const {
+    configTab,
+    setConfigTab,
+    configPane,
+    setConfigPane,
+    abconfs,
+    setAbconfs,
+    selectedAbconfIndex,
+    setSelectedAbconfIndex,
+    selectedConfigFileAction,
+    setSelectedConfigFileAction,
+    normalConfigPayload,
+    setNormalConfigPayload,
+    systemConfigPayload,
+    setSystemConfigPayload,
+    selectedConfigGroupIndex,
+    setSelectedConfigGroupIndex,
+    selectedConfigSettingIndex,
+    setSelectedConfigSettingIndex,
+    editingConfigSettingKey,
+    setEditingConfigSettingKey,
+    configEditValue,
+    setConfigEditValue,
+    configEditCursor,
+    setConfigEditCursor,
+    loadingConfig,
+    setLoadingConfig,
+    savingConfig,
+    setSavingConfig,
+    configFileActionDialog,
+    setConfigFileActionDialog,
+    pendingConfigDeleteId,
+    setPendingConfigDeleteId,
+  } = useConfigState();
   const {
     platforms,
     setPlatforms,
@@ -383,6 +430,7 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
   );
   const ctx: ControllerCtx = {
     isBootLoading,
+    abconfs,
     activeView,
     agentEditCursor,
     agentEditValue,
@@ -393,8 +441,15 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     commandSummary,
     commands,
     componentsView,
+    configEditCursor,
+    configEditValue,
+    configFileActionDialog,
+    configPane,
+    configTab,
     consoleScrollOffset,
+    currentPersonaFolderId,
     editingAgentFieldKey,
+    editingConfigSettingKey,
     editingPersonaDraft,
     editingPersonaOriginal,
     editingPlatformSettingKey,
@@ -416,6 +471,7 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     isTogglingPlatform,
     isTogglingProvider,
     lastStatsUpdatedAt,
+    loadingConfig,
     loadingPluginConfigName,
     loadingPluginDetailName,
     loadingProviderSourceModelsId,
@@ -427,11 +483,14 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     messageScrollOffset,
     messages,
     pendingMarketInstallWarning,
+    pendingConfigDeleteId,
     pendingMarketPluginKey,
     pendingPersonaDeleteId,
     pendingPlatformDelete,
     pendingPluginDeleteName,
     pendingProviderDelete,
+    personaFolders,
+    personaFolderTree,
     personas,
     platformEditCursor,
     platformEditValue,
@@ -463,7 +522,12 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     providerType,
     rows,
     selectedAgentAction,
+    selectedAbconfIndex,
+    selectedAgentEntryIndex,
     selectedAgentFieldIndex,
+    selectedConfigFileAction,
+    selectedConfigGroupIndex,
+    selectedConfigSettingIndex,
     selectedCommandIndex,
     selectedMarketPluginIndex,
     selectedPersonaIndex,
@@ -499,8 +563,17 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     setCommandSummary,
     setCommands,
     setComponentsView,
+    setAbconfs,
+    setConfigEditCursor,
+    setConfigEditValue,
+    setConfigFileActionDialog,
+    setConfigPane,
+    setConfigTab,
+    setSelectedConfigGroupIndex,
     setConsoleScrollOffset,
+    setCurrentPersonaFolderId,
     setEditingAgentFieldKey,
+    setEditingConfigSettingKey,
     setEditingPersonaDraft,
     setEditingPersonaOriginal,
     setEditingPlatformSettingKey,
@@ -521,6 +594,7 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     setIsTogglingPlatform,
     setIsTogglingProvider,
     setLastStatsUpdatedAt,
+    setLoadingConfig,
     setLoadingPluginConfigName,
     setLoadingPluginDetailName,
     setLoadingProviderSourceModelsId,
@@ -533,11 +607,14 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     setMessages,
     setNotice,
     setPendingMarketInstallWarning,
+    setPendingConfigDeleteId,
     setPendingMarketPluginKey,
     setPendingPersonaDeleteId,
     setPendingPlatformDelete,
     setPendingPluginDeleteName,
     setPendingProviderDelete,
+    setPersonaFolders,
+    setPersonaFolderTree,
     setPersonas,
     setPlatformEditCursor,
     setPlatformEditValue,
@@ -568,7 +645,11 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     setProviderTemplate,
     setProviderType,
     setSelectedAgentAction,
+    setSelectedAbconfIndex,
+    setSelectedAgentEntryIndex,
     setSelectedAgentFieldIndex,
+    setSelectedConfigFileAction,
+    setSelectedConfigSettingIndex,
     setSelectedCommandIndex,
     setSelectedMarketPluginIndex,
     setSelectedPersonaIndex,
@@ -604,6 +685,14 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     setWorkingMarketPluginName,
     setWorkingPersonaId,
     setWorkingPluginName,
+    savingConfig,
+    setSavingConfig,
+    normalConfigPayload,
+    setNormalConfigPayload,
+    systemConfigPayload,
+    setSystemConfigPayload,
+    creatingPersonaFolder,
+    setCreatingPersonaFolder,
     stats,
     statsHistory,
     statusScrollOffset,
@@ -619,10 +708,15 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
   };
   const {
     agentFields,
+    agentEntries,
+    abconfWindowStart,
     chatMeta,
     commandMeta,
     commandWindowStart,
     componentSummary,
+    configFileViewportHeight,
+    configSettingViewportHeight,
+    configSettingWindowStart,
     consoleMeta,
     currentSessionTitle,
     filteredMarketPlugins,
@@ -634,6 +728,8 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     marketPluginWindowStart,
     maxStatusScrollOffset,
     personaWindowStart,
+    currentPersonaFolderName,
+    currentPersonaFolderPath,
     platformTemplates,
     platformWindowStart,
     pluginComponentWindowStart,
@@ -647,7 +743,15 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     providerTemplates,
     providerWindowStart,
     selectedAgentField,
+    selectedAbconf,
     selectedCommand,
+    selectedConfigPayload,
+    selectedConfigSetting,
+    selectedConfigGroups,
+    selectedConfigGroupIndex: clampedConfigGroupIndex,
+    selectedConfigGroupSettings,
+    selectedConfigSettings,
+    selectedConfigVisibleSettingIndex,
     selectedMarketPlugin,
     selectedPersona,
     selectedPlatform,
@@ -665,11 +769,13 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     sessionTitleText,
     showChatSidebar,
     toolWindowStart,
+    visibleAbconfs,
     visibleCommands,
+    visibleConfigSettings,
     visibleConsoleLines,
     visibleMarketPlugins,
     visibleMessageRows,
-    visiblePersonas,
+    visibleAgentEntries,
     visiblePlatforms,
     visiblePluginComponents,
     visiblePluginConfigSettings,
@@ -819,9 +925,13 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
             <AgentsView
               width={layout.contentWidth}
               personas={personas}
-              visiblePersonas={visiblePersonas}
-              personaWindowStart={personaWindowStart}
-              selectedPersonaIndex={selectedPersonaIndex}
+              folders={personaFolders}
+              currentFolderName={currentPersonaFolderName}
+              currentFolderPath={currentPersonaFolderPath}
+              entries={agentEntries}
+              visibleEntries={visibleAgentEntries}
+              entryWindowStart={personaWindowStart}
+              selectedEntryIndex={selectedAgentEntryIndex}
               selectedAgentAction={selectedAgentAction}
               selectedAgentFieldIndex={selectedAgentFieldIndex}
               agentPane={agentPane}
@@ -832,6 +942,33 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
               editingAgentFieldKey={editingAgentFieldKey}
               workingPersonaId={workingPersonaId}
               i18n={i18n}
+            />
+          ) : null}
+
+          {activeView === "config" ? (
+            <ConfigView
+              i18n={i18n}
+              width={layout.contentWidth}
+              height={layout.bodyHeight}
+              configTab={configTab}
+              configPane={configPane}
+              abconfs={abconfs}
+              visibleAbconfs={visibleAbconfs}
+              abconfWindowStart={abconfWindowStart}
+              selectedAbconfIndex={selectedAbconfIndex}
+              selectedConfigFileAction={selectedConfigFileAction}
+              payload={selectedConfigPayload}
+              groups={selectedConfigGroups}
+              selectedGroupIndex={clampedConfigGroupIndex}
+              visibleSettings={visibleConfigSettings}
+              settingWindowStart={configSettingWindowStart}
+              settingCount={selectedConfigGroupSettings.length}
+              selectedConfigSettingIndex={selectedConfigVisibleSettingIndex}
+              selectedSetting={selectedConfigSetting}
+              editingConfigSettingKey={editingConfigSettingKey}
+              loading={loadingConfig}
+              saving={savingConfig}
+              pendingConfigDeleteId={pendingConfigDeleteId}
             />
           ) : null}
 
@@ -929,6 +1066,36 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
           value={agentEditValue}
           cursor={agentEditCursor}
           saving={Boolean(workingPersonaId)}
+          i18n={i18n}
+        />
+      ) : null}
+      {editingConfigSettingKey && selectedConfigSetting ? (
+        <PluginConfigSettingDialog
+          columns={columns}
+          rows={rows}
+          setting={selectedConfigSetting}
+          i18n={i18n}
+          value={configEditValue}
+          cursor={configEditCursor}
+          saving={savingConfig}
+          title={i18n.t("tui.config.editConfig", "Edit Config")}
+        />
+      ) : null}
+      {configFileActionDialog ? (
+        <ConfigFileActionDialog
+          columns={columns}
+          rows={rows}
+          dialog={configFileActionDialog}
+          saving={savingConfig}
+          i18n={i18n}
+        />
+      ) : null}
+      {creatingPersonaFolder ? (
+        <ConfigFileActionDialog
+          columns={columns}
+          rows={rows}
+          dialog={creatingPersonaFolder}
+          saving={workingPersonaId === "__folder__"}
           i18n={i18n}
         />
       ) : null}
