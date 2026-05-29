@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import type { I18n } from "../i18n/index.js";
 import { useTerminalSize } from "./appHelpers.js";
-import { clampCursor, insertAtCursor, removeAtCursor } from "./dialogControls.js";
+import { clampCursor, editWindow, insertAtCursor, removeAtCursor } from "./dialogControls.js";
+import { truncateCells } from "./terminal.js";
 
 export interface SetupValues {
   serverUrl: string;
@@ -114,14 +115,21 @@ export function SetupView({
       return;
     }
     if (value && !key.ctrl && !key.meta) {
+      // Strip newlines/control chars so pasted text (e.g. a URL with a trailing
+      // newline) can never break the value across multiple lines.
+      const clean = value.replace(/[\u0000-\u001f\u007f]+/g, "");
+      if (!clean) {
+        return;
+      }
       updateFocused((field) => {
-        const nextValue = insertAtCursor(field.value, field.cursor, value);
-        return { value: nextValue, cursor: clampCursor(field.cursor + value.length, nextValue.length) };
+        const nextValue = insertAtCursor(field.value, field.cursor, clean);
+        return { value: nextValue, cursor: clampCursor(field.cursor + clean.length, nextValue.length) };
       });
     }
   });
 
   const panelWidth = Math.max(40, Math.min(columns - 4, 72));
+  const fieldWidth = Math.max(10, panelWidth - 10);
 
   return (
     <Box width={columns} height={rows} alignItems="center" justifyContent="center">
@@ -134,18 +142,21 @@ export function SetupView({
           field={fields.server}
           focused={focus === "server"}
           disabled={submitting}
+          width={fieldWidth}
         />
         <Field
           label={i18n.t("features.auth.username", "Username")}
           field={fields.username}
           focused={focus === "username"}
           disabled={submitting}
+          width={fieldWidth}
         />
         <Field
           label={i18n.t("features.auth.password", "Password")}
           field={fields.password}
           focused={focus === "password"}
           disabled={submitting}
+          width={fieldWidth}
           mask
         />
         <Text> </Text>
@@ -170,21 +181,19 @@ function Field({
   field,
   focused,
   disabled,
+  width,
   mask = false,
 }: {
   label: string;
   field: FieldState;
   focused: boolean;
   disabled?: boolean;
+  width: number;
   mask?: boolean;
 }) {
   const display = mask ? "*".repeat(field.value.length) : field.value;
-  const chars = Array.from(display);
-  const cursor = clampCursor(field.cursor, chars.length);
-  const left = chars.slice(0, cursor).join("");
-  const cursorChar = chars[cursor] ?? " ";
-  const right = chars.slice(cursor + (cursor < chars.length ? 1 : 0)).join("");
   const pointerColor = focused ? "cyan" : "gray";
+  const view = editWindow(display, clampCursor(field.cursor, Array.from(display).length), width);
 
   return (
     <Box flexDirection="column" marginBottom={1}>
@@ -195,13 +204,13 @@ function Field({
       <Box>
         <Text color={pointerColor}>{"  | "}</Text>
         {focused && !disabled ? (
-          <Text>
-            {left}
-            <Text inverse>{cursorChar}</Text>
-            {right}
+          <Text wrap="truncate">
+            {view.left}
+            <Text inverse>{view.cursor || " "}</Text>
+            {view.right}
           </Text>
         ) : (
-          <Text>{display || " "}</Text>
+          <Text wrap="truncate">{truncateCells(display, width) || " "}</Text>
         )}
       </Box>
     </Box>
