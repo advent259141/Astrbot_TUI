@@ -203,15 +203,17 @@ function Field({
       </Text>
       <Box>
         <Text color={pointerColor}>{"  | "}</Text>
-        {focused && !disabled ? (
-          <Text wrap="truncate">
-            {view.left}
-            <Text inverse>{view.cursor || " "}</Text>
-            {view.right}
-          </Text>
-        ) : (
-          <Text wrap="truncate">{truncateCells(display, width) || " "}</Text>
-        )}
+        <Box width={width} flexShrink={0}>
+          {focused && !disabled ? (
+            <Text>
+              {view.left}
+              <Text inverse>{view.cursor || " "}</Text>
+              {view.right}
+            </Text>
+          ) : (
+            <Text>{truncateCells(display, width) || " "}</Text>
+          )}
+        </Box>
       </Box>
     </Box>
   );
