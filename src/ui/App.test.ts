@@ -4,6 +4,7 @@ import { stripVTControlCharacters } from "node:util";
 import { render } from "ink";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DashboardClient } from "../api/client.js";
+import { ApiError } from "../api/errors.js";
 import { App } from "./App.js";
 
 const cleanups: Array<() => void> = [];
@@ -28,6 +29,7 @@ function mockClient() {
     getAstrBotConfig: vi.fn(async () => ({ config: {}, metadata: {} })),
     getPlatforms: vi.fn(async () => ({ platforms: [] })),
     getPlatformStats: vi.fn(async () => ({ platforms: [] })),
+    getLogHistory: vi.fn(async () => ({ logs: [{ time: 123, message: "Recent log" }] })),
     liveLogs: vi.fn(async function* ({ signal }: { signal: AbortSignal }) { await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true })); }),
     resumeChatRun: vi.fn(async function* (_id: string, { signal }: { signal: AbortSignal }) {
       yield { type: "run_snapshot", data: { status: "running", content: { type: "bot", message: [{ type: "plain", text: "Recovered running response" }] } } };
@@ -45,11 +47,11 @@ function mockClient() {
   };
 }
 
-function mount(client: ReturnType<typeof mockClient>) {
+function mount(client: ReturnType<typeof mockClient>, onUnauthorized?: () => void) {
   let frame = "";
   const stdout = Object.assign(new Writable({ write(chunk, _encoding, done) { frame = stripVTControlCharacters(String(chunk)); done(); } }), { columns: 100, rows: 32, isTTY: true });
   const stdin = Object.assign(new PassThrough(), { isTTY: true, setRawMode() {}, ref() {}, unref() {} });
-  const instance = render(React.createElement(App, { client: client as unknown as DashboardClient, serverUrl: "http://localhost:6185", tokenStoreKind: "test", locale: "en-US" }), { stdout: stdout as unknown as NodeJS.WriteStream, stdin: stdin as unknown as NodeJS.ReadStream, stderr: stdout as unknown as NodeJS.WriteStream, debug: true, patchConsole: false, exitOnCtrlC: false });
+  const instance = render(React.createElement(App, { client: client as unknown as DashboardClient, serverUrl: "http://localhost:6185", tokenStoreKind: "test", locale: "en-US", onUnauthorized }), { stdout: stdout as unknown as NodeJS.WriteStream, stdin: stdin as unknown as NodeJS.ReadStream, stderr: stdout as unknown as NodeJS.WriteStream, debug: true, patchConsole: false, exitOnCtrlC: false });
   cleanups.push(() => { instance.unmount(); instance.cleanup(); stdin.destroy(); stdout.destroy(); });
   return { frame: () => frame, type: async (input: string) => {
     // Let React commit useInput subscriptions before delivering the next keystroke.
@@ -59,14 +61,82 @@ function mount(client: ReturnType<typeof mockClient>) {
 }
 
 describe("workbench integration", () => {
-  it("loads other sections even when one startup request fails", async () => {
+  it("requests reauthentication on a chat-list 401 without a separate version request", async () => {
+    const client = mockClient();
+    client.getSessions.mockRejectedValue(new ApiError("Expired session", 401));
+    const onUnauthorized = vi.fn();
+    mount(client, onUnauthorized);
+    await vi.waitFor(() => expect(onUnauthorized).toHaveBeenCalledOnce());
+    expect(client.getVersion).not.toHaveBeenCalled();
+  });
+
+  it("keeps the workspace usable for server failures without forcing a login", async () => {
+    const client = mockClient();
+    client.getSessions.mockRejectedValue(new ApiError("Service unavailable", 503));
+    const onUnauthorized = vi.fn();
+    const app = mount(client, onUnauthorized);
+    await vi.waitFor(() => expect(app.frame()).toContain("Service unavailable"));
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    await app.type("\u001b[Z");
+    await vi.waitFor(() => expect(app.frame()).toContain("Task A"));
+  });
+
+  it("starts chat without requesting unused management sections", async () => {
     const client = mockClient();
     client.getStats.mockRejectedValue(new Error("stats unavailable"));
     const app = mount(client);
     await vi.waitFor(() => expect(app.frame()).toContain("First chat"));
-    expect(client.getProviderTemplate).toHaveBeenCalled();
-    expect(client.getPlatforms).toHaveBeenCalled();
-    expect(app.frame()).toContain("stats unavailable");
+    expect(client.getProviderTemplate).not.toHaveBeenCalled();
+    expect(client.getPlatforms).not.toHaveBeenCalled();
+    expect(client.getStats).not.toHaveBeenCalled();
+    expect(client.getTools).not.toHaveBeenCalled();
+    expect(client.getPlugins).not.toHaveBeenCalled();
+    expect(client.getPersonas).not.toHaveBeenCalled();
+    expect(client.liveLogs).not.toHaveBeenCalled();
+  });
+
+  it("opens the workspace and preserves input while the chat list is still loading", async () => {
+    const client = mockClient();
+    client.getSessions.mockImplementation(async () => new Promise(() => {}));
+    const app = mount(client);
+    await vi.waitFor(() => expect(app.frame()).toContain("/help for chat actions"));
+    await app.type("Do not lose this message");
+    await app.type("\r");
+    await vi.waitFor(() => expect(app.frame()).toContain("> Do not lose this message"));
+    expect(client.sendMessage).not.toHaveBeenCalled();
+    await app.type("\t");
+    await vi.waitFor(() => expect(client.getStats).toHaveBeenCalledOnce());
+  });
+
+  it("loads statistics and recent logs only on their pages and cancels log subscriptions on exit", async () => {
+    const client = mockClient();
+    const app = mount(client);
+    await vi.waitFor(() => expect(app.frame()).toContain("First chat"));
+    await app.type("\t");
+    await vi.waitFor(() => expect(client.getStats).toHaveBeenCalledOnce());
+    await app.type("\t");
+    await vi.waitFor(() => expect(app.frame()).toContain("Recent log"));
+    await vi.waitFor(() => expect(client.liveLogs).toHaveBeenCalledWith(expect.objectContaining({ lastEventId: "123" })));
+    const signal = client.liveLogs.mock.calls[0][0].signal;
+    expect(signal.aborted).toBe(false);
+    await app.type("\t");
+    await vi.waitFor(() => expect(signal.aborted).toBe(true));
+    const calls = client.getStats.mock.calls.length;
+    vi.useFakeTimers();
+    try {
+      await vi.advanceTimersByTimeAsync(9000);
+      expect(client.getStats).toHaveBeenCalledTimes(calls);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("does not repeatedly fetch empty persona folders when entering the persona page", async () => {
+    const client = mockClient();
+    const app = mount(client);
+    await vi.waitFor(() => expect(app.frame()).toContain("First chat"));
+    for (let index = 0; index < 5; index++) await app.type("\t");
+    await vi.waitFor(() => expect(client.getPersonas).toHaveBeenCalledOnce());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(client.getPersonas).toHaveBeenCalledOnce();
   });
 
   it("ignores an older chat's history response after selecting another chat", async () => {

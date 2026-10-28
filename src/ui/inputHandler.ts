@@ -2576,6 +2576,10 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
         return;
       }
       const submitted = input.trim();
+      if (ctx.loadingSessions) {
+        setNotice(i18n.t("tui.boot.loadingChats", "Loading chat sessions..."));
+        return;
+      }
       setInput("");
       if (!submitted) {
         if (selectedSidebarAction === "new") {

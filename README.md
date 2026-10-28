@@ -12,6 +12,10 @@ The current implementation was checked against [AstrBot master `abf68307`](https
 
 This is a terminal client for common administration tasks. Browser-only pages, media previews, and the full WebUI editor are outside its current scope.
 
+After signing in, the workspace opens immediately while its chat list/history load. Management sections load when opened and reuse loaded data. Statistics poll only on the status page; the console loads recent logs and subscribes to live logs only while open. Use `Ctrl+R` or `/refresh` for a full workbench refresh.
+
+Ordinary GET requests have a 15-second deadline and report which endpoint timed out. Chat/log streams and long-running writes are not subject to this default read deadline.
+
 ## Install
 
 ```bash

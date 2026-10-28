@@ -4,7 +4,7 @@ import { useTerminalInput } from "./useTerminalInput.js";
 import QRCode from "qrcode";
 import type { DashboardClient } from "../api/client.js";
 import { recoverChatStream } from "../api/chatRun.js";
-import { messageFromUnknown } from "../api/errors.js";
+import { ApiError, messageFromUnknown } from "../api/errors.js";
 import {
   createI18n,
   resolveConfigList,
@@ -593,6 +593,8 @@ export function useAppController(ctx: ControllerCtx) {
   selectedSessionRef.current = selectedSessionId;
   const historyRequestRef = useRef(0);
   const sessionListRequestRef = useRef(0);
+  const loadedSectionsRef = useRef(new Set<string>());
+  const [loadingSessions, setLoadingSessions] = useState(false);
   const pendingChatDeleteRef = useRef<string | null>(null);
   const historyPageRef = useRef({ page: 1, hasMore: false, loading: false });
   const showChatSidebar = activeView === "chat";
@@ -660,35 +662,40 @@ export function useAppController(ctx: ControllerCtx) {
     async (preferredSessionId?: string, filterOverride = sessionFilter) => {
       const requestId = ++sessionListRequestRef.current;
       const selectionAtStart = selectedSessionRef.current;
-      const nextSessions = await client.getSessions();
-      if (requestId !== sessionListRequestRef.current) return null;
-      setSessions(nextSessions);
-      if (!nextSessions.length) {
-        setSelectedSessionId(null);
-        setMessages([]);
-        setMessageScrollOffset(0);
-        return null;
+      setLoadingSessions(true);
+      try {
+        const nextSessions = await client.getSessions();
+        if (requestId !== sessionListRequestRef.current) return null;
+        setSessions(nextSessions);
+        if (!nextSessions.length) {
+          setSelectedSessionId(null);
+          setMessages([]);
+          setMessageScrollOffset(0);
+          return null;
+        }
+
+        const nextFilteredSessions = nextSessions.filter((session) =>
+          sessionMatchesFilter(session, filterOverride),
+        );
+        const targetId = selectedSessionRef.current === selectionAtStart
+          ? preferredSessionId || selectedSessionRef.current : selectedSessionRef.current;
+        const nextSession =
+          nextFilteredSessions.find((session) => session.session_id === targetId) ||
+          nextFilteredSessions[0] ||
+          (filterOverride ? null : nextSessions[0]);
+
+        if (!nextSession) {
+          setSelectedSessionId(null);
+          setMessages([]);
+          setMessageScrollOffset(0);
+          return null;
+        }
+
+        setSelectedSessionId(nextSession.session_id);
+        return nextSession;
+      } finally {
+        if (requestId === sessionListRequestRef.current) setLoadingSessions(false);
       }
-
-      const nextFilteredSessions = nextSessions.filter((session) =>
-        sessionMatchesFilter(session, filterOverride),
-      );
-      const targetId = selectedSessionRef.current === selectionAtStart
-        ? preferredSessionId || selectedSessionRef.current : selectedSessionRef.current;
-      const nextSession =
-        nextFilteredSessions.find((session) => session.session_id === targetId) ||
-        nextFilteredSessions[0] ||
-        (filterOverride ? null : nextSessions[0]);
-
-      if (!nextSession) {
-        setSelectedSessionId(null);
-        setMessages([]);
-        setMessageScrollOffset(0);
-        return null;
-      }
-
-      setSelectedSessionId(nextSession.session_id);
-      return nextSession;
     },
     [client, sessionFilter],
   );
@@ -728,17 +735,20 @@ export function useAppController(ctx: ControllerCtx) {
       disabled: payload.summary.disabled,
       conflicts: payload.summary.conflicts,
     }));
+    loadedSectionsRef.current.add("commands");
   }, [client, i18n]);
 
   const reloadTools = useCallback(async () => {
     const payload = await client.getTools();
     setTools(payload || []);
+    loadedSectionsRef.current.add("tools");
   }, [client]);
 
   const reloadPlugins = useCallback(async () => {
     const payload = await client.getPlugins();
     const nextPlugins = annotatePluginsWithMarket(payload || [], marketPlugins);
     setPlugins(nextPlugins);
+    loadedSectionsRef.current.add("plugins");
     if (marketPlugins.length) {
       setMarketPlugins(annotateMarketPlugins(marketPlugins, nextPlugins));
     }
@@ -784,6 +794,7 @@ export function useAppController(ctx: ControllerCtx) {
     setPersonaFolders(foldersPayload || []);
     setPersonas(personasPayload || []);
     setPersonaFolderTree(treePayload || []);
+    loadedSectionsRef.current.add("agents");
     return personasPayload || [];
   }, [
     client,
@@ -933,7 +944,21 @@ export function useAppController(ctx: ControllerCtx) {
   ]);
 
   useEffect(() => {
-    void refreshAll();
+    let disposed = false;
+    // Render the workspace immediately; management pages load only when opened.
+    setIsBootLoading(false);
+    setNotice(i18n.t("tui.boot.loadingChats", "Loading chat sessions..."));
+    void loadSessions().then(() => {
+      if (!disposed) setNotice(i18n.t("tui.boot.refreshed", "Refreshed."));
+    }).catch((error) => {
+      if (disposed) return;
+      if (error instanceof ApiError && error.statusCode === 401 && ctx.onUnauthorized) {
+        ctx.onUnauthorized();
+      } else {
+        setNotice(messageFromUnknown(error));
+      }
+    });
+    return () => { disposed = true; };
   }, []);
 
   useEffect(() => {
@@ -988,24 +1013,21 @@ export function useAppController(ctx: ControllerCtx) {
   }, [loadSessionMessages, selectedSession?.session_id]);
 
   useEffect(() => {
+    if (activeView !== "status") return;
+    void refreshStats().catch((error) => setNotice(messageFromUnknown(error)));
     const interval = setInterval(() => {
       void refreshStats()
         .catch((error) => setNotice(messageFromUnknown(error)));
     }, 8000);
     return () => clearInterval(interval);
-  }, [refreshStats]);
-
-  useEffect(() => {
-    if (activeView !== "status") {
-      return;
-    }
-    void refreshStats().catch((error) => setNotice(messageFromUnknown(error)));
   }, [activeView, refreshStats]);
 
   useEffect(() => {
+    if (activeView !== "console") return;
     const abort = new AbortController();
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let attempts = 0;
+    let lastEventId: string | undefined;
 
     const scheduleReconnect = (error: unknown) => {
       if (abort.signal.aborted) {
@@ -1023,12 +1045,13 @@ export function useAppController(ctx: ControllerCtx) {
 
     const connect = async () => {
       try {
-        for await (const log of client.liveLogs({ signal: abort.signal })) {
+        for await (const log of client.liveLogs({ signal: abort.signal, lastEventId })) {
           if (attempts > 0) {
             setNotice(i18n.t("tui.console.reconnected", "Live logs reconnected."));
             attempts = 0;
           }
           setLogs((current) => [...current.slice(-119), log]);
+          if (log.time != null) lastEventId = String(log.time);
         }
         // Stream ended without error (server closed); retry.
         scheduleReconnect(new Error("terminated"));
@@ -1039,24 +1062,36 @@ export function useAppController(ctx: ControllerCtx) {
       }
     };
 
-    void connect();
+    const load = async () => {
+      try {
+        const history = await client.getLogHistory({ signal: abort.signal });
+        if (abort.signal.aborted) return;
+        const recent = (history.logs || []).slice(-120);
+        setLogs(recent);
+        if (recent.at(-1)?.time != null) lastEventId = String(recent.at(-1)!.time);
+      } catch {
+        // Older dashboards may only expose live logs.
+      }
+      if (!abort.signal.aborted) await connect();
+    };
+    void load();
     return () => {
       abort.abort();
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
       }
     };
-  }, [client]);
+  }, [activeView, client]);
 
   useEffect(() => {
     if (activeView !== "commands") {
       return;
     }
-    if (componentsView === "commands" && !commands.length) {
+    if (componentsView === "commands" && !loadedSectionsRef.current.has("commands")) {
       void reloadCommands()
         .catch((error) => setNotice(messageFromUnknown(error)));
     }
-    if (componentsView === "tools" && !tools.length) {
+    if (componentsView === "tools" && !loadedSectionsRef.current.has("tools")) {
       void reloadTools()
         .catch((error) => setNotice(messageFromUnknown(error)));
     }
@@ -1070,7 +1105,7 @@ export function useAppController(ctx: ControllerCtx) {
   ]);
 
   useEffect(() => {
-    if (activeView !== "plugins" || plugins.length) {
+    if (activeView !== "plugins" || loadedSectionsRef.current.has("plugins")) {
       return;
     }
     void reloadPlugins()
@@ -1085,7 +1120,7 @@ export function useAppController(ctx: ControllerCtx) {
   }, [activeView, marketStatus, pluginTab, reloadPluginMarket]);
 
   useEffect(() => {
-    if (activeView !== "agents" || personas.length) {
+    if (activeView !== "agents" || loadedSectionsRef.current.has("agents")) {
       return;
     }
     void reloadPersonas()
@@ -5212,6 +5247,7 @@ export function useAppController(ctx: ControllerCtx) {
       })
     : i18n.t("tui.chat.chats", "Chats");
   const chatMeta = [
+    loadingSessions ? i18n.t("tui.boot.loadingChats", "Loading chat sessions...") : "",
     isSending ? i18n.t("tui.chat.streaming", "streaming") : "",
     messageScrollOffset > 0
       ? i18n.t("tui.chat.history", "history +{count}", { count: messageScrollOffset })
@@ -5330,6 +5366,7 @@ export function useAppController(ctx: ControllerCtx) {
   const inputCtx: InputContext = {
     ...ctx,
     refreshAll,
+    loadingSessions,
     activeView,
     agentEditCursor,
     agentEditValue,

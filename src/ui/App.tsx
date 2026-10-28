@@ -139,9 +139,10 @@ interface AppProps {
   username?: string;
   tokenStoreKind: string;
   locale?: string;
+  onUnauthorized?: () => void;
 }
 
-export function App({ client, serverUrl, username, tokenStoreKind, locale }: AppProps) {
+export function App({ client, serverUrl, username, tokenStoreKind, locale, onUnauthorized }: AppProps) {
   const { exit } = useApp();
   const i18n = useMemo(() => createI18n(locale), [locale]);
   const [columns, rows] = useTerminalSize();
@@ -433,6 +434,7 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     i18n.t("tui.boot.loadingData", "Loading AstrBot Dashboard data..."),
   );
   const ctx: ControllerCtx = {
+    onUnauthorized,
     isBootLoading,
     abconfs,
     activeView,

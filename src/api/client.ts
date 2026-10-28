@@ -575,14 +575,19 @@ export class DashboardClient {
     });
   }
 
+  async getLogHistory(options: { signal?: AbortSignal } = {}): Promise<{ logs: LiveLogPayload[] }> {
+    return this.request<{ logs: LiveLogPayload[] }>("/api/log-history", { method: "GET", signal: options.signal });
+  }
+
   async *liveLogs(
-    options: { signal?: AbortSignal } = {},
+    options: { signal?: AbortSignal; lastEventId?: string } = {},
   ): AsyncGenerator<LiveLogPayload> {
     const response = await this.fetchRaw("/api/live-log", {
       method: "GET",
       signal: options.signal,
       headers: {
         Accept: "text/event-stream",
+        ...(options.lastEventId ? { "Last-Event-ID": options.lastEventId } : {}),
       },
     });
     yield* parseJsonEventSource<LiveLogPayload>(
@@ -633,34 +638,45 @@ export class DashboardClient {
       query?: Record<string, string | number | boolean | null | undefined>;
     } = {},
   ): Promise<T> {
-    const response = await this.fetchRaw(path, init);
-    let payload: unknown;
+    const method = init.method || "GET";
+    // Bound finite reads, including response bodies. Streaming and long-running writes use their own lifecycles.
+    const signal = init.signal ?? (method === "GET" ? AbortSignal.timeout(15000) : undefined);
     try {
-      payload = await response.json();
-    } catch {
-      throw new ApiError(
-        `Dashboard returned a non-JSON response (${init.method || "GET"} ${path}): HTTP ${response.status}`,
-        response.status,
-      );
-    }
+      const response = await this.fetchRaw(path, { ...init, signal });
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        throw new ApiError(
+          `Dashboard returned a non-JSON response (${init.method || "GET"} ${path}): HTTP ${response.status}`,
+          response.status,
+        );
+      }
 
-    if (!response.ok) {
-      const envelope = payload as
-        | (Partial<ApiEnvelope<T>> & { error_code?: unknown })
-        | null;
-      const message = envelope?.message ? String(envelope.message) : "";
-      throw new ApiError(
-        message ||
-          `Dashboard request failed (${init.method || "GET"} ${path}): HTTP ${response.status}`,
-        response.status,
-        envelope?.data,
-        typeof envelope?.error_code === "string"
-          ? envelope.error_code
-          : undefined,
-      );
-    }
+      if (!response.ok) {
+        const envelope = payload as
+          | (Partial<ApiEnvelope<T>> & { error_code?: unknown })
+          | null;
+        const message = envelope?.message ? String(envelope.message) : "";
+        throw new ApiError(
+          message ||
+            `Dashboard request failed (${init.method || "GET"} ${path}): HTTP ${response.status}`,
+          response.status,
+          envelope?.data,
+          typeof envelope?.error_code === "string"
+            ? envelope.error_code
+            : undefined,
+        );
+      }
 
-    return unwrapApiEnvelope<T>(payload, response.status);
+      return unwrapApiEnvelope<T>(payload, response.status);
+    } catch (error) {
+      if (signal?.aborted && signal.reason?.name === "TimeoutError") {
+        throw new ApiError(`Dashboard request timed out (${method} ${path}).`, 408);
+      }
+      throw error;
+    }
   }
 
   private async requestEnvelope<T>(

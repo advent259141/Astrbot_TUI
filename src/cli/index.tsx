@@ -5,7 +5,7 @@ import { input, password } from "@inquirer/prompts";
 import { render } from "ink";
 import { App } from "../ui/App.js";
 import { SetupView, type SetupValues } from "../ui/SetupView.js";
-import { ApiError, messageFromUnknown } from "../api/errors.js";
+import { messageFromUnknown } from "../api/errors.js";
 import type { I18n } from "../i18n/index.js";
 import {
   loadProfile,
@@ -192,23 +192,12 @@ type Session = Awaited<ReturnType<typeof getAuthenticatedClient>>;
 
 async function startWorkbench(serverFlag?: string, localeFlag?: string): Promise<void> {
   let session: Session | null = null;
-  let sessionExpired = false;
   const profile = await loadProfile();
   const defaultServerUrl = resolveServerUrl(serverFlag, profile?.serverUrl);
   try {
     session = await getAuthenticatedClient(serverFlag);
-    try {
-      await session.client.getVersion();
-    } catch (error) {
-      if (error instanceof ApiError && error.statusCode === 401) {
-        session = null;
-        sessionExpired = true;
-      } else {
-        throw error;
-      }
-    }
   } catch (error) {
-    // A missing token or an expired JWT falls through to the sign-in screen.
+    // A missing token falls through to the sign-in screen; the first chat request validates saved tokens.
     if (!(error instanceof NoStoredTokenError)) {
       throw error;
     }
@@ -222,7 +211,6 @@ async function startWorkbench(serverFlag?: string, localeFlag?: string): Promise
     <Root
       i18n={workbenchI18n}
       initialSession={session}
-      sessionExpired={sessionExpired}
       defaultServerUrl={defaultServerUrl}
       defaultUsername={defaultUsername}
       locale={localeFlag}
@@ -233,19 +221,18 @@ async function startWorkbench(serverFlag?: string, localeFlag?: string): Promise
 function Root({
   i18n: rootI18n,
   initialSession,
-  sessionExpired,
   defaultServerUrl,
   defaultUsername,
   locale,
 }: {
   i18n: I18n;
   initialSession: Session | null;
-  sessionExpired: boolean;
   defaultServerUrl: string;
   defaultUsername: string;
   locale?: string;
 }) {
   const [session, setSession] = useState<Session | null>(initialSession);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   if (!session) {
     return (
@@ -276,6 +263,10 @@ function Root({
       username={session.username}
       tokenStoreKind={session.tokenStoreKind}
       locale={locale}
+      onUnauthorized={() => {
+        setSessionExpired(true);
+        setSession(null);
+      }}
     />
   );
 }
