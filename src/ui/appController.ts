@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, Text, useApp, useInput, useStdout } from "ink";
+import { Box, Text, useApp, useStdout } from "ink";
+import { useTerminalInput } from "./useTerminalInput.js";
 import QRCode from "qrcode";
 import type { DashboardClient } from "../api/client.js";
 import { recoverChatStream } from "../api/chatRun.js";
@@ -5662,7 +5663,7 @@ export function useAppController(ctx: ControllerCtx) {
     workingPersonaId,
     workingPluginName,
   };
-  useInput((value, key) => handleInput(value, key, inputCtx));
+  useTerminalInput((value, key) => handleInput(value, key, inputCtx));
   return {
     abortRef,
     addSelectedAvailableProviderModel,

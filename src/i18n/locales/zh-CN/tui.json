@@ -74,7 +74,7 @@
         "connecting": "正在连接 {serverUrl}……",
         "retry": "连接或登录失败，请检查信息后重试。",
         "cancelled": "已取消初始化。",
-        "hint": "Tab / ↑↓ 切换字段   Enter 下一项/连接   Esc 退出",
+        "hint": "Tab/↑↓ 切换字段 · Ctrl+U 清空 · Enter 下一项/连接 · Esc 退出",
         "connect": "连接",
         "fillAll": "请填写服务器地址和用户名。",
         "firstAccount": "此 Dashboard 尚未创建账户。请确认密码以创建首个账户。",

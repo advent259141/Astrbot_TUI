@@ -14,7 +14,7 @@ npm run build
 node dist/cli/index.js --lang zh-CN --server http://localhost:6185
 ```
 
-首次运行进入连接界面；新部署的 Dashboard 会要求确认密码后创建首个账户，已开启两步验证的账户会要求输入验证码或恢复码。已保存的登录过期时可重新登录：
+首次运行进入连接界面；输入框支持 Backspace 退格、Delete 向后删除、`Ctrl+U` 清空当前字段、`Ctrl+A` / `Ctrl+E` 跳到开头/末尾。新部署的 Dashboard 会要求确认密码后创建首个账户，已开启两步验证的账户会要求输入验证码或恢复码。已保存的登录过期时可重新登录：
 
 ```bash
 node dist/cli/index.js login --server http://localhost:6185 --username astrbot

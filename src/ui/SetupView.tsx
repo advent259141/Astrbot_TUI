@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp } from "ink";
+import { useTerminalInput } from "./useTerminalInput.js";
 import type { I18n } from "../i18n/index.js";
 import {
   DashboardSetupCompletedError,
@@ -43,8 +44,8 @@ export function SetupView({
   const { exit } = useApp();
   const [columns, rows] = useTerminalSize();
   const [fields, setFields] = useState<Record<FieldKey, FieldState>>({
-    server: { value: defaultServerUrl, cursor: defaultServerUrl.length },
-    username: { value: defaultUsername, cursor: defaultUsername.length },
+    server: { value: defaultServerUrl, cursor: Array.from(defaultServerUrl).length },
+    username: { value: defaultUsername, cursor: Array.from(defaultUsername).length },
     password: { value: "", cursor: 0 },
     confirmPassword: { value: "", cursor: 0 },
     code: { value: "", cursor: 0 },
@@ -126,12 +127,20 @@ export function SetupView({
     });
   };
 
-  useInput((value, key) => {
+  useTerminalInput((value, key) => {
     if (submitting) {
       return;
     }
     if (key.escape || (key.ctrl && value === "c")) {
       exit();
+      return;
+    }
+    if (key.ctrl && value === "u") {
+      updateFocused(() => ({ value: "", cursor: 0 }));
+      return;
+    }
+    if (key.ctrl && (value === "a" || value === "e")) {
+      updateFocused((field) => ({ ...field, cursor: value === "a" ? 0 : Array.from(field.value).length }));
       return;
     }
     if (key.tab) {
@@ -155,18 +164,18 @@ export function SetupView({
       return;
     }
     if (key.leftArrow) {
-      updateFocused((field) => ({ ...field, cursor: clampCursor(field.cursor - 1, field.value.length) }));
+      updateFocused((field) => ({ ...field, cursor: clampCursor(field.cursor - 1, Array.from(field.value).length) }));
       return;
     }
     if (key.rightArrow) {
-      updateFocused((field) => ({ ...field, cursor: clampCursor(field.cursor + 1, field.value.length) }));
+      updateFocused((field) => ({ ...field, cursor: clampCursor(field.cursor + 1, Array.from(field.value).length) }));
       return;
     }
     if (key.backspace || key.delete) {
       updateFocused((field) => {
         const nextValue = removeAtCursor(field.value, field.cursor, key.backspace ? "backward" : "forward");
         const nextCursor = key.backspace ? field.cursor - 1 : field.cursor;
-        return { value: nextValue, cursor: clampCursor(nextCursor, nextValue.length) };
+        return { value: nextValue, cursor: clampCursor(nextCursor, Array.from(nextValue).length) };
       });
       return;
     }
@@ -179,7 +188,7 @@ export function SetupView({
       }
       updateFocused((field) => {
         const nextValue = insertAtCursor(field.value, field.cursor, clean);
-        return { value: nextValue, cursor: clampCursor(field.cursor + clean.length, nextValue.length) };
+        return { value: nextValue, cursor: clampCursor(field.cursor + Array.from(clean).length, Array.from(nextValue).length) };
       });
     }
   });
@@ -259,7 +268,7 @@ export function SetupView({
         ) : error ? (
           <Text color="red">{error}</Text>
         ) : (
-          <Text dimColor>{i18n.t("tui.cli.setup.hint", "Tab / arrows switch fields   Enter next/connect   Esc quit")}</Text>
+          <Text dimColor>{i18n.t("tui.cli.setup.hint", "Tab / arrows switch fields   Ctrl+U clear   Enter next/connect   Esc quit")}</Text>
         )}
       </Box>
     </Box>
@@ -281,7 +290,7 @@ function Field({
   width: number;
   mask?: boolean;
 }) {
-  const display = mask ? "*".repeat(field.value.length) : field.value;
+  const display = mask ? "*".repeat(Array.from(field.value).length) : field.value;
   const pointerColor = focused ? "cyan" : "gray";
   const view = editWindow(display, clampCursor(field.cursor, Array.from(display).length), width);
 

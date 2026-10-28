@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
+import { useTerminalInput } from "./useTerminalInput.js";
 import type { DashboardClient } from "../api/client.js";
 import { ManagementClient } from "../api/management.js";
 import type {
@@ -591,7 +592,7 @@ export function ManagementView({ client, width, height, i18n, active = true }: M
       ? `${label("page")} ${knowledgeDetail ? knowledgeDocumentPage : knowledgePage}/${Math.max(1, Math.ceil((knowledgeDetail ? knowledgeDocumentTotal : knowledgeTotal) / 100))}`
       : "";
 
-  useInput((input, key) => {
+  useTerminalInput((input, key) => {
     if (prompt) {
       if (key.escape) {
         inputValue.current = "";

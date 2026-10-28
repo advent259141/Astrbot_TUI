@@ -40,6 +40,8 @@ Server selection follows this order: `--server`, `ASTR_TUI_SERVER`, `ASTRBOT_DAS
 
 First-run setup detects a fresh Dashboard and requests password confirmation before creating its first account. Existing accounts with two-step verification prompt for a TOTP or recovery code. For scripted logins, provide the code with `login --code <code>` alongside `--password-stdin`.
 
+In the connection form, use Backspace to erase, Delete to remove the next character, `Ctrl+U` to clear the current field, and `Ctrl+A` / `Ctrl+E` to move to its start/end.
+
 ## Commands
 
 ```bash
