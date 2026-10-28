@@ -30,7 +30,15 @@
       "streaming": "streaming",
       "streamingResponse": "Streaming response...",
       "title": "AstrBot Chat",
-      "workspace": "Chat workspace"
+      "workspace": "Chat workspace",
+      "commands": "/new · /rename NAME · /delete · /stop · /older · /refresh · /search TEXT · /help",
+      "helpHint": "/help for chat actions",
+      "resuming": "Reconnecting to the running response...",
+      "stopped": "Response stopped.",
+      "renameHint": "Use /rename NAME to rename this chat.",
+      "deleted": "Chat deleted.",
+      "confirmDelete": "Delete {name} and its history? Type /delete confirm to confirm.",
+      "noOlder": "No earlier messages are available."
     },
     "cli": {
       "description": "Terminal workbench for AstrBot Dashboard",
@@ -45,7 +53,8 @@
         "failed": "Login failed: {error}",
         "options": {
           "passwordStdin": "Read the Dashboard password from stdin",
-          "username": "Dashboard username"
+          "username": "Dashboard username",
+          "code": "TOTP or recovery code"
         },
         "success": "Logged in as {username}. Token stored with {kind}."
       },
@@ -67,7 +76,14 @@
         "cancelled": "Setup cancelled.",
         "hint": "Tab / ↑↓ switch fields   Enter next/connect   Esc quit",
         "connect": "Connect",
-        "fillAll": "Please fill in the server address and username."
+        "fillAll": "Please fill in the server address and username.",
+        "firstAccount": "This Dashboard has no account yet. Confirm the password to create its first account.",
+        "confirmPassword": "Confirm password",
+        "username": "Create the first Dashboard username",
+        "password": "Choose a Dashboard password",
+        "totpRequired": "This Dashboard requires a TOTP or recovery code.",
+        "totpPrompt": "Enter the TOTP or recovery code.",
+        "sessionExpired": "Your saved session has expired. Sign in again to continue."
       },
       "status": {
         "description": "Check the stored session and Dashboard version"
@@ -500,7 +516,10 @@
       "loadingConfig": "Loading plugin {name} config...",
       "loadingConfigPlain": "Loading plugin config...",
       "loadingDetail": "Loading plugin {name} details...",
+      "loadingMarket": "Loading market plugins...",
       "market": "Market",
+      "marketLoaded": "Loaded market plugins.",
+      "marketLoadFailed": "Failed to load market plugins.",
       "marketMatched": "{shown}/{total} matched",
       "marketSearchHint": "Type plugin name, author, category, tag, or repo.",
       "marketSearchHintShort": "Type to filter.",
@@ -734,6 +753,9 @@
       "summary": "Runtime, messages, platform traffic and model calls.",
       "title": "System Stats",
       "updated": "Updated"
+    },
+    "management": {
+      "title": "Manage"
     }
   }
 }

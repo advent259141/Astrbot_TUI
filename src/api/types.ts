@@ -3,7 +3,14 @@ export type ApiStatus = "ok" | "error" | "warning";
 export interface ApiEnvelope<T> {
   status: ApiStatus;
   message?: string | null;
+  error_code?: string;
   data: T;
+}
+
+export interface AuthSetupStatus {
+  setup_required?: boolean;
+  skip_default_password_auth?: boolean;
+  password_upgrade_required?: boolean;
 }
 
 export interface LoginResponse {
@@ -11,6 +18,7 @@ export interface LoginResponse {
   username: string;
   change_pwd_hint?: boolean;
   legacy_pwd_hint?: boolean;
+  md5_pwd_hint?: boolean;
   password_upgrade_required?: boolean;
 }
 
@@ -19,7 +27,7 @@ export interface ChatSession {
   platform_id: string;
   creator?: string;
   display_name?: string | null;
-  is_group?: boolean;
+  is_group?: boolean | number;
   created_at?: string;
   updated_at?: string;
 }
@@ -49,14 +57,32 @@ export interface ChatRecord {
   local_id?: string;
   content: ChatContent;
   created_at?: string;
+  updated_at?: string;
+  platform_id?: string;
+  user_id?: string;
   sender_id?: string;
   sender_name?: string;
   llm_checkpoint_id?: string | null;
+  [key: string]: unknown;
 }
 
 export interface ChatSessionPayload {
+  session?: ChatSession;
   history: ChatRecord[];
+  total?: number;
+  page?: number;
+  page_size?: number;
+  has_more?: boolean;
   is_running?: boolean;
+  active_runs?: Array<{
+    run_id: string;
+    session_id?: string;
+    status?: string;
+    revision?: number;
+    llm_checkpoint_id?: string | null;
+    content?: ChatContent;
+    [key: string]: unknown;
+  }>;
   threads?: unknown[];
   project?: unknown;
 }
@@ -111,6 +137,8 @@ export interface ModelRankingItem {
 
 export interface UmoRankingItem {
   umo: string;
+  display_name?: string;
+  platform_type?: string;
   tokens: number;
 }
 
@@ -161,6 +189,7 @@ export interface ProviderTemplatePayload {
   config_schema?: Record<string, unknown>;
   providers: ProviderConfig[];
   provider_sources: ProviderSourceConfig[];
+  model_metadata?: Record<string, Record<string, unknown>>;
 }
 
 export interface PlatformConfig {
@@ -188,6 +217,7 @@ export interface PlatformQrPayload {
 
 export interface PlatformRuntimeStat {
   id: string;
+  type?: string;
   status?: string;
   error_count?: number;
   last_error?: PlatformRuntimeError | null;
@@ -198,6 +228,12 @@ export interface PlatformRuntimeStat {
 
 export interface PlatformStatsPayload {
   platforms?: PlatformRuntimeStat[];
+  summary?: {
+    total: number;
+    running: number;
+    error: number;
+    total_errors?: number;
+  };
   [key: string]: unknown;
 }
 
@@ -336,7 +372,9 @@ export interface PersonaMutationPayload {
 }
 
 export interface KnowledgeBaseItem {
-  name: string;
+  kb_id?: string;
+  kb_name?: string;
+  name?: string;
   description?: string;
   doc_count?: number;
   chunk_count?: number;
@@ -345,6 +383,8 @@ export interface KnowledgeBaseItem {
 
 export interface KnowledgeBaseListPayload {
   items?: KnowledgeBaseItem[];
+  page?: number;
+  page_size?: number;
   total?: number;
   [key: string]: unknown;
 }
@@ -353,9 +393,16 @@ export interface VersionPayload {
   version: string;
   dashboard_version?: string | null;
   change_pwd_hint?: boolean;
+  md5_pwd_hint?: boolean;
   legacy_pwd_hint?: boolean;
   password_upgrade_required?: boolean;
   need_migration?: boolean;
+  runtime?: {
+    os: string;
+    arch: string;
+    sandbox: Record<string, unknown>;
+  };
+  [key: string]: unknown;
 }
 
 export interface LiveLogPayload {
@@ -409,6 +456,14 @@ export interface ToolItem {
   };
   origin?: string;
   origin_name?: string;
+  origin_display_name?: string;
+  permission_configured?: boolean;
+  builtin_config_statuses?: Array<{
+    conf_id: string;
+    conf_name: string;
+    config: Record<string, unknown>;
+    [key: string]: unknown;
+  }>;
   builtin_config_tags?: Array<{
     conf_id: string;
     conf_name: string;
@@ -420,6 +475,7 @@ export interface ToolItem {
 
 export interface CommandsPayload {
   items: CommandItem[];
+  wake_prefix?: string;
   summary: {
     total: number;
     disabled: number;

@@ -80,6 +80,7 @@ export interface PluginsViewProps {
   loadingPluginConfigName: string | null;
   editingPluginConfigSettingKey: string | null;
   marketPlugins: PluginMarketItem[];
+  marketStatus?: "idle" | "loading" | "loaded" | "error";
   marketTotalCount: number;
   marketFilter: string;
   isEditingMarketFilter: boolean;
@@ -119,6 +120,7 @@ export function PluginsView({
   loadingPluginConfigName,
   editingPluginConfigSettingKey,
   marketPlugins,
+  marketStatus = "loaded",
   marketTotalCount,
   marketFilter,
   isEditingMarketFilter,
@@ -182,6 +184,7 @@ export function PluginsView({
               i18n={i18n}
               width={listWidth - 4}
               marketPlugins={marketPlugins}
+              marketStatus={marketStatus}
               visibleMarketPlugins={visibleMarketPlugins}
               marketPluginWindowStart={marketPluginWindowStart}
               selectedMarketPluginIndex={selectedMarketPluginIndex}
@@ -392,6 +395,7 @@ function MarketList({
   i18n,
   width,
   marketPlugins,
+  marketStatus,
   visibleMarketPlugins,
   marketPluginWindowStart,
   selectedMarketPluginIndex,
@@ -401,6 +405,7 @@ function MarketList({
   i18n: I18n;
   width: number;
   marketPlugins: PluginMarketItem[];
+  marketStatus: "idle" | "loading" | "loaded" | "error";
   visibleMarketPlugins: PluginMarketItem[];
   marketPluginWindowStart: number;
   selectedMarketPluginIndex: number;
@@ -428,7 +433,13 @@ function MarketList({
           );
         })
       ) : (
-        <Text dimColor>{i18n.t("tui.plugins.noMarketLoaded", "No market plugins loaded.")}</Text>
+        <Text dimColor>
+          {marketStatus === "loading"
+            ? i18n.t("tui.plugins.loadingMarket", "Loading market plugins...")
+            : marketStatus === "error"
+              ? i18n.t("tui.plugins.marketLoadFailed", "Failed to load market plugins.")
+              : i18n.t("tui.plugins.noMarketLoaded", "No market plugins loaded.")}
+        </Text>
       )}
     </>
   );

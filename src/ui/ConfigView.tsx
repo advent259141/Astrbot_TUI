@@ -71,7 +71,8 @@ export function ConfigView({
     : 0;
   const detailWidth = Math.max(34, bodyWidth - groupWidth - (groupWidth ? 2 : 0));
   const panelHeight = Math.max(1, height - 3);
-  const fileManagerActive = configPane === "fileDialog" || configPane === "fileActions";
+  const fileManagerActive =
+    configPane === "fileButton" || configPane === "fileDialog" || configPane === "fileActions";
   const selectedConfig = abconfs[selectedAbconfIndex] || null;
   const meta = configTab === "system"
     ? i18n.t("tui.config.meta.system", "System config")
@@ -212,7 +213,8 @@ function ConfigTabs({
 }) {
   const tabFocused = configPane === "tabs";
   const fileButtonFocused = configPane === "fileButton";
-  const fileManagerActive = configPane === "fileDialog" || configPane === "fileActions";
+  const fileManagerActive =
+    configPane === "fileButton" || configPane === "fileDialog" || configPane === "fileActions";
   const selectedConfig = abconfs[selectedAbconfIndex] || null;
   const status = saving
     ? i18n.t("tui.common.saving", "saving")

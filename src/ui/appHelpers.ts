@@ -60,9 +60,28 @@ export function sessionMatchesFilter(session: ChatSession, rawFilter: string): b
     .includes(filter);
 }
 
-export function nextMainView(current: MainView): MainView {
+export function nextMainView(current: MainView, direction = 1): MainView {
   const index = MAIN_VIEWS.indexOf(current);
-  return MAIN_VIEWS[(index + 1) % MAIN_VIEWS.length];
+  return MAIN_VIEWS[(index + direction + MAIN_VIEWS.length) % MAIN_VIEWS.length];
+}
+
+export function visibleMainViews(current: MainView, width: number, i18n: I18n): MainView[] {
+  let start = MAIN_VIEWS.indexOf(current);
+  let end = start + 1;
+  let used = terminalWidth(viewLabel(current, i18n)) + 4;
+  while (start > 0) {
+    const size = terminalWidth(viewLabel(MAIN_VIEWS[start - 1], i18n)) + 4;
+    if (used + size > width) break;
+    used += size;
+    start--;
+  }
+  while (end < MAIN_VIEWS.length) {
+    const size = terminalWidth(viewLabel(MAIN_VIEWS[end], i18n)) + 4;
+    if (used + size > width) break;
+    used += size;
+    end++;
+  }
+  return MAIN_VIEWS.slice(start, end);
 }
 
 export function viewLabel(view: MainView, i18n: I18n): string {
@@ -89,6 +108,9 @@ export function viewLabel(view: MainView, i18n: I18n): string {
   }
   if (view === "platforms") {
     return i18n.t("core.navigation.platforms", "Platforms");
+  }
+  if (view === "management") {
+    return i18n.t("tui.management.title", "Manage");
   }
   return i18n.t("core.navigation.providers", "Providers");
 }
@@ -1165,7 +1187,7 @@ export async function loadPluginSpecialChoices({
         })),
     ];
   } else if (special === "select_persona" || special === "persona_pool") {
-    const personas = await client.getPersonas("");
+    const personas = await client.getPersonas();
     choices = [
       {
         label: i18n.t("core.shared.personaSelector.defaultPersona", "Default"),
@@ -1179,8 +1201,8 @@ export async function loadPluginSpecialChoices({
   } else if (special === "select_knowledgebase") {
     const payload = await client.getKnowledgeBases();
     choices = (payload.items || []).map((item) => ({
-      label: String(item.name || "-"),
-      value: String(item.name || ""),
+      label: String(item.kb_name || item.name || "-"),
+      value: String(item.kb_name || item.name || ""),
       description: [
         item.description,
         item.doc_count !== undefined

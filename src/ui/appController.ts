@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import QRCode from "qrcode";
 import type { DashboardClient } from "../api/client.js";
+import { recoverChatStream } from "../api/chatRun.js";
 import { messageFromUnknown } from "../api/errors.js";
 import {
   createI18n,
@@ -10,9 +11,8 @@ import {
   type I18n,
 } from "../i18n/index.js";
 import {
+  applyChatEvent,
   appendPlainPart,
-  appendThinkPart,
-  appendTypedPart,
   normalizeChatRecord,
   payloadText,
   textFromParts,
@@ -37,7 +37,6 @@ import type {
   PluginDetail,
   PluginItem,
   PluginMarketItem,
-  PluginMarketPayload,
   ProviderCheckResult,
   ProviderConfig,
   ProviderSourceConfig,
@@ -349,6 +348,7 @@ export function useAppController(ctx: ControllerCtx) {
     marketFilter,
     marketFilterCursor,
     marketPlugins,
+    marketStatus,
     messageScrollOffset,
     messages,
     pendingMarketInstallWarning,
@@ -456,6 +456,7 @@ export function useAppController(ctx: ControllerCtx) {
     setMarketFilter,
     setMarketFilterCursor,
     setMarketPlugins,
+    setMarketStatus,
     setMessageScrollOffset,
     setMessages,
     setNotice,
@@ -587,6 +588,12 @@ export function useAppController(ctx: ControllerCtx) {
     systemConfigPayload,
   } = ctx;
   const abortRef = useRef<AbortController | null>(null);
+  const selectedSessionRef = useRef(selectedSessionId);
+  selectedSessionRef.current = selectedSessionId;
+  const historyRequestRef = useRef(0);
+  const sessionListRequestRef = useRef(0);
+  const pendingChatDeleteRef = useRef<string | null>(null);
+  const historyPageRef = useRef({ page: 1, hasMore: false, loading: false });
   const showChatSidebar = activeView === "chat";
 
   const layout = useMemo(() => {
@@ -650,7 +657,10 @@ export function useAppController(ctx: ControllerCtx) {
 
   const loadSessions = useCallback(
     async (preferredSessionId?: string, filterOverride = sessionFilter) => {
+      const requestId = ++sessionListRequestRef.current;
+      const selectionAtStart = selectedSessionRef.current;
       const nextSessions = await client.getSessions();
+      if (requestId !== sessionListRequestRef.current) return null;
       setSessions(nextSessions);
       if (!nextSessions.length) {
         setSelectedSessionId(null);
@@ -662,8 +672,10 @@ export function useAppController(ctx: ControllerCtx) {
       const nextFilteredSessions = nextSessions.filter((session) =>
         sessionMatchesFilter(session, filterOverride),
       );
+      const targetId = selectedSessionRef.current === selectionAtStart
+        ? preferredSessionId || selectedSessionRef.current : selectedSessionRef.current;
       const nextSession =
-        nextFilteredSessions.find((session) => session.session_id === preferredSessionId) ||
+        nextFilteredSessions.find((session) => session.session_id === targetId) ||
         nextFilteredSessions[0] ||
         (filterOverride ? null : nextSessions[0]);
 
@@ -682,23 +694,29 @@ export function useAppController(ctx: ControllerCtx) {
 
   const loadSessionMessages = useCallback(
     async (sessionId: string) => {
+      const requestId = ++historyRequestRef.current;
       const payload = await client.getSession(sessionId);
+      if (requestId !== historyRequestRef.current || selectedSessionRef.current !== sessionId || abortRef.current) return;
       setMessages((payload.history || []).map(normalizeChatRecord));
+      historyPageRef.current = { page: payload.page || 1, hasMore: Boolean(payload.has_more), loading: false };
       setMessageScrollOffset(0);
+      return payload;
     },
     [client],
   );
 
   const refreshStats = useCallback(async () => {
-    const [nextStats, nextProviderStats, nextVersion] = await Promise.all([
+    const results = await Promise.allSettled([
       client.getStats({ offsetSec: tokenRange * 24 * 60 * 60 }),
       client.getProviderTokenStats(tokenRange),
       client.getVersion(),
     ]);
-    applyStats(nextStats);
-    setProviderStats(nextProviderStats);
-    setVersion(nextVersion);
+    if (results[0].status === "fulfilled") applyStats(results[0].value);
+    if (results[1].status === "fulfilled") setProviderStats(results[1].value);
+    if (results[2].status === "fulfilled") setVersion(results[2].value);
     setLastStatsUpdatedAt(new Date());
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
   }, [applyStats, client, tokenRange]);
 
   const reloadCommands = useCallback(async () => {
@@ -717,15 +735,43 @@ export function useAppController(ctx: ControllerCtx) {
   }, [client]);
 
   const reloadPlugins = useCallback(async () => {
-    const [payload, marketPayload] = await Promise.all([
-      client.getPlugins(),
-      client.getPluginMarketList().catch(() => [] as PluginMarketPayload),
-    ]);
-    const normalizedMarket = normalizePluginMarket(marketPayload);
-    const nextPlugins = annotatePluginsWithMarket(payload || [], normalizedMarket);
+    const payload = await client.getPlugins();
+    const nextPlugins = annotatePluginsWithMarket(payload || [], marketPlugins);
     setPlugins(nextPlugins);
-    setMarketPlugins(annotateMarketPlugins(normalizedMarket, nextPlugins));
-  }, [client]);
+    if (marketPlugins.length) {
+      setMarketPlugins(annotateMarketPlugins(marketPlugins, nextPlugins));
+    }
+  }, [client, marketPlugins, setMarketPlugins]);
+
+  const reloadPluginMarket = useCallback(async () => {
+    if (marketStatus === "loading") {
+      return;
+    }
+    setMarketStatus("loading");
+    try {
+      const payload = await client.getPluginMarketList();
+      const normalizedMarket = normalizePluginMarket(payload);
+      const nextMarketPlugins = annotateMarketPlugins(normalizedMarket, plugins);
+      setMarketPlugins(nextMarketPlugins);
+      if (plugins.length) {
+        setPlugins(annotatePluginsWithMarket(plugins, nextMarketPlugins));
+      }
+      setMarketStatus("loaded");
+      setNotice(i18n.t("tui.plugins.marketLoaded", "Loaded market plugins."));
+    } catch (error) {
+      setMarketStatus("error");
+      setNotice(messageFromUnknown(error));
+    }
+  }, [
+    client,
+    i18n,
+    marketStatus,
+    plugins,
+    setMarketPlugins,
+    setMarketStatus,
+    setNotice,
+    setPlugins,
+  ]);
 
   const reloadPersonas = useCallback(async (folderId = currentPersonaFolderId) => {
     const normalizedFolderId = folderId || "";
@@ -856,28 +902,14 @@ export function useAppController(ctx: ControllerCtx) {
 
   const refreshAll = useCallback(async () => {
     try {
-      setBootStatus(i18n.t("tui.boot.loadingChats", "Loading chat sessions..."));
-      const currentId = selectedSession?.session_id;
-      const nextSession = await loadSessions(currentId);
-      if (nextSession?.session_id) {
-        setBootStatus(i18n.t("tui.boot.loadingHistory", "Loading current chat history..."));
-        await loadSessionMessages(nextSession.session_id);
-      }
-      setBootStatus(i18n.t("tui.boot.loadingStats", "Loading runtime statistics..."));
-      await refreshStats();
-      setBootStatus(i18n.t("tui.boot.loadingCommands", "Loading commands and function tools..."));
-      await Promise.all([reloadCommands(), reloadTools()]);
-      setBootStatus(i18n.t("tui.boot.loadingPlugins", "Loading plugins..."));
-      await reloadPlugins();
-      setBootStatus(i18n.t("tui.boot.loadingPersonas", "Loading personas..."));
-      await reloadPersonas();
-      setBootStatus(i18n.t("tui.boot.loadingConfig", "Loading config..."));
-      await reloadConfigs();
-      setBootStatus(i18n.t("tui.boot.loadingProviders", "Loading providers..."));
-      await reloadProviders();
-      setBootStatus(i18n.t("tui.boot.loadingPlatforms", "Loading platforms..."));
-      await reloadPlatforms();
-      setNotice(i18n.t("tui.boot.refreshed", "Refreshed."));
+      setBootStatus(i18n.t("tui.boot.loadingData", "Loading AstrBot Dashboard data..."));
+      const sections = ["Chat", "Stats", "Commands", "Tools", "Plugins", "Personas", "Config", "Providers", "Platforms"];
+      const results = await Promise.allSettled([
+        loadSessions(selectedSessionRef.current || undefined), refreshStats(), reloadCommands(), reloadTools(),
+        reloadPlugins(), reloadPersonas(), reloadConfigs(), reloadProviders(), reloadPlatforms(),
+      ]);
+      const errors = results.flatMap((result, index) => result.status === "rejected" ? [`${sections[index]}: ${messageFromUnknown(result.reason)}`] : []);
+      setNotice(errors.length ? errors.join(" | ") : i18n.t("tui.boot.refreshed", "Refreshed."));
     } catch (error) {
       setNotice(messageFromUnknown(error));
       setBootStatus(messageFromUnknown(error));
@@ -904,12 +936,54 @@ export function useAppController(ctx: ControllerCtx) {
   }, []);
 
   useEffect(() => {
-    if (!selectedSession?.session_id) {
-      return;
-    }
-    void loadSessionMessages(selectedSession.session_id).catch((error) => {
-      setNotice(messageFromUnknown(error));
-    });
+    const sessionId = selectedSession?.session_id;
+    setIsSending(false);
+    setMessages([]);
+    historyPageRef.current = { page: 1, hasMore: false, loading: false };
+    pendingChatDeleteRef.current = null;
+    if (!sessionId) return;
+    let canceled = false;
+    const abort = new AbortController();
+    const load = async () => {
+      const payload = await loadSessionMessages(sessionId);
+      if (!payload || canceled || selectedSessionRef.current !== sessionId || abortRef.current) return;
+      const run = payload.active_runs?.[0];
+      if (!run?.run_id) return;
+      const localId = `active-run-${run.run_id}`;
+      setMessages((current) => [...current, { local_id: localId, content: { type: "bot", message: [], isLoading: true } }]);
+      setIsSending(true);
+      abortRef.current = abort;
+      setNotice(i18n.t("tui.chat.resuming", "Reconnecting to the running response..."));
+      let streamFailed = false;
+      try {
+        for await (const event of recoverChatStream(client, sessionId, client.resumeChatRun(run.run_id, { signal: abort.signal }), abort.signal, { runId: run.run_id })) {
+          if (canceled) break;
+          if ((event.type || event.t) === "error") {
+            streamFailed = true;
+            setNotice(payloadText(event.data));
+          }
+          setMessages((current) => current.map((record) => record.local_id === localId ? applyChatEvent(record, event) : record));
+        }
+        if (!canceled && !abort.signal.aborted && !streamFailed) setNotice(i18n.t("tui.chat.responseComplete", "Response complete."));
+      } catch (error) {
+        streamFailed = true;
+        throw error;
+      } finally {
+        if (abortRef.current === abort) {
+          abortRef.current = null;
+          setIsSending(false);
+          if (!canceled && !streamFailed) await loadSessionMessages(sessionId);
+        }
+      }
+    };
+    void load().catch((error) => { if (!canceled) setNotice(messageFromUnknown(error)); });
+    return () => {
+      canceled = true;
+      abort.abort();
+      // Leaving a chat detaches its subscriber. Generation continues on the server.
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
   }, [loadSessionMessages, selectedSession?.session_id]);
 
   useEffect(() => {
@@ -1001,6 +1075,13 @@ export function useAppController(ctx: ControllerCtx) {
     void reloadPlugins()
       .catch((error) => setNotice(messageFromUnknown(error)));
   }, [activeView, plugins.length, reloadPlugins]);
+
+  useEffect(() => {
+    if (activeView !== "plugins" || pluginTab !== "market" || marketStatus === "loaded" || marketStatus === "loading") {
+      return;
+    }
+    void reloadPluginMarket();
+  }, [activeView, marketStatus, pluginTab, reloadPluginMarket]);
 
   useEffect(() => {
     if (activeView !== "agents" || personas.length) {
@@ -1483,10 +1564,7 @@ export function useAppController(ctx: ControllerCtx) {
       setSessionFilter("");
       setSelectedSidebarAction(null);
       setActiveView("chat");
-      const selected = await loadSessions(session.session_id, "");
-      if (selected?.session_id) {
-        await loadSessionMessages(selected.session_id);
-      }
+      await loadSessions(session.session_id, "");
       setNotice(i18n.t("tui.chat.createdSession", "Created a new WebChat session."));
     } catch (error) {
       setNotice(messageFromUnknown(error));
@@ -4654,14 +4732,69 @@ export function useAppController(ctx: ControllerCtx) {
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!selectedSession?.session_id || isSending) {
-        return;
-      }
-
-      const messageText = text.trim();
+      let messageText = text.trim();
       if (!messageText) {
         return;
       }
+      const [command] = messageText.split(/\s+/, 1);
+      const argument = messageText.slice(command.length).trim();
+      try {
+        if (command === "/help") {
+          setNotice(i18n.t("tui.chat.commands", "/new · /rename NAME · /delete · /stop · /older · /refresh · /search TEXT · /help"));
+          return;
+        }
+        if (command === "/new") { await createSession(); return; }
+        if (command === "/refresh") {
+          await refreshAll();
+          if (selectedSessionId && !abortRef.current) await loadSessionMessages(selectedSessionId);
+          return;
+        }
+        if (command === "/search") { setSessionFilter(argument); return; }
+        if (command === "/older") {
+          const pageState = historyPageRef.current;
+          if (!selectedSessionId || pageState.loading || abortRef.current) return;
+          if (!pageState.hasMore) { setNotice(i18n.t("tui.chat.noOlder", "No earlier messages are available.")); return; }
+          pageState.loading = true;
+          try {
+            const payload = await client.getSession(selectedSessionId, { page: pageState.page + 1 });
+            if (selectedSessionRef.current !== selectedSessionId || abortRef.current) return;
+            historyPageRef.current = { page: payload.page || pageState.page + 1, hasMore: Boolean(payload.has_more), loading: false };
+            setMessages((current) => {
+              const ids = new Set(current.filter((record) => record.id != null).map((record) => String(record.id)));
+              const fresh = payload.history.filter((record) => record.id == null || !ids.has(String(record.id))).map(normalizeChatRecord);
+              return [...fresh, ...current];
+            });
+            setMessageScrollOffset(Number.MAX_SAFE_INTEGER);
+          } finally { pageState.loading = false; }
+          return;
+        }
+        if (["/rename", "/delete", "/stop"].includes(command)) {
+          if (!selectedSession?.session_id) return;
+          const sessionId = selectedSession.session_id;
+          if (command === "/stop") {
+            await client.stopSession(sessionId);
+            abortRef.current?.abort();
+            setNotice(i18n.t("tui.chat.stopped", "Response stopped."));
+          } else if (command === "/rename") {
+            if (!argument) { setNotice(i18n.t("tui.chat.renameHint", "Use /rename NAME to rename this chat.")); return; }
+            await client.renameSession(sessionId, argument);
+            await loadSessions(selectedSessionRef.current || undefined);
+          } else if (argument === "confirm" && pendingChatDeleteRef.current === sessionId) {
+            pendingChatDeleteRef.current = null;
+            await client.deleteSession(sessionId);
+            await loadSessions();
+            setNotice(i18n.t("tui.chat.deleted", "Chat deleted."));
+          } else {
+            pendingChatDeleteRef.current = sessionId;
+            setNotice(i18n.t("tui.chat.confirmDelete", "Delete {name} and its history? Type /delete confirm to confirm.", { name: sessionTitle(selectedSession) }));
+          }
+          return;
+        }
+      } catch (error) { setNotice(messageFromUnknown(error)); return; }
+      pendingChatDeleteRef.current = null;
+      if (!selectedSession?.session_id || isSending || abortRef.current) return;
+      if (messageText.startsWith("//")) messageText = messageText.slice(1);
+      ++historyRequestRef.current;
       setActiveView("chat");
       setMessageScrollOffset(0);
 
@@ -4703,12 +4836,12 @@ export function useAppController(ctx: ControllerCtx) {
         );
       };
 
+      let streamFailed = false;
       try {
-        for await (const payload of client.sendMessage(selectedSession.session_id, messageText, {
+        for await (const payload of recoverChatStream(client, selectedSession.session_id, client.sendMessage(selectedSession.session_id, messageText, {
           signal: abort.signal,
-        })) {
+        }), abort.signal)) {
           const type = String(payload.type || payload.t || "");
-          const chainType = String(payload.chain_type || "");
           const data = payload.data;
 
           if (type === "user_message_saved") {
@@ -4731,96 +4864,34 @@ export function useAppController(ctx: ControllerCtx) {
             continue;
           }
 
-          if (type === "message_saved") {
-            setMessages((current) =>
-              current.map((record) =>
-                record.local_id === localBotId
-                  ? {
-                      ...record,
-                      id: (data as { id?: string | number })?.id || record.id,
-                      created_at:
-                        (data as { created_at?: string })?.created_at ||
-                        record.created_at,
-                      llm_checkpoint_id:
-                        (data as { llm_checkpoint_id?: string })?.llm_checkpoint_id ||
-                        record.llm_checkpoint_id,
-                      content: {
-                        ...record.content,
-                        refs: (data as { refs?: Record<string, unknown> })?.refs,
-                        isLoading: false,
-                      },
-                    }
-                  : record,
-              ),
-            );
-            continue;
-          }
-
-          if (type === "agent_stats" || chainType === "agent_stats") {
-            updateBot((record) => ({
-              ...record,
-              content: {
-                ...record.content,
-                agent_stats: data as Record<string, unknown>,
-                isLoading: false,
-              },
-            }));
-            continue;
-          }
-
-          if (type === "plain") {
-            const textChunk = payloadText(data);
-            updateBot((record) =>
-              chainType === "reasoning"
-                ? appendThinkPart(record, textChunk)
-                : appendPlainPart(record, textChunk),
-            );
-            continue;
-          }
-
-          if (["image", "record", "file", "video"].includes(type)) {
-            updateBot((record) =>
-              appendTypedPart(record, {
-                type,
-                filename: payloadText(data)
-                  .replace("[IMAGE]", "")
-                  .replace("[RECORD]", "")
-                  .replace("[FILE]", "")
-                  .replace("[VIDEO]", ""),
-              }),
-            );
-            continue;
-          }
-
           if (type === "error") {
-            updateBot((record) => appendPlainPart(record, `\n${payloadText(data)}`));
+            streamFailed = true;
+            setNotice(payloadText(data));
           }
-
-          if (type === "complete" || type === "break" || type === "end") {
-            updateBot((record) => ({
-              ...record,
-              content: {
-                ...record.content,
-                isLoading: false,
-              },
-            }));
-          }
+          updateBot((record) => applyChatEvent(record, payload));
         }
-        setNotice(i18n.t("tui.chat.responseComplete", "Response complete."));
+        if (!streamFailed && selectedSessionRef.current === selectedSession.session_id) setNotice(i18n.t("tui.chat.responseComplete", "Response complete."));
       } catch (error) {
         if (!abort.signal.aborted) {
+          streamFailed = true;
           updateBot((record) =>
             appendPlainPart(record, `\n${messageFromUnknown(error)}`),
           );
           setNotice(messageFromUnknown(error));
         }
       } finally {
-        abortRef.current = null;
-        setIsSending(false);
-        await loadSessions(selectedSession.session_id).catch(() => undefined);
+        updateBot((record) => ({ ...record, content: { ...record.content, isLoading: false } }));
+        if (abortRef.current === abort) {
+          abortRef.current = null;
+          setIsSending(false);
+          if (selectedSessionRef.current === selectedSession.session_id) {
+            await loadSessions(selectedSession.session_id).catch(() => undefined);
+            if (!abort.signal.aborted && !streamFailed) await loadSessionMessages(selectedSession.session_id).catch(() => undefined);
+          }
+        }
       }
     },
-    [client, isSending, loadSessions, selectedSession?.session_id],
+    [client, createSession, i18n, isSending, loadSessionMessages, loadSessions, refreshAll, selectedSession, selectedSessionId],
   );
 
 
@@ -5257,6 +5328,7 @@ export function useAppController(ctx: ControllerCtx) {
 
   const inputCtx: InputContext = {
     ...ctx,
+    refreshAll,
     activeView,
     agentEditCursor,
     agentEditValue,
@@ -5720,6 +5792,7 @@ export function useAppController(ctx: ControllerCtx) {
     reloadPersonas,
     reloadPlatformStats,
     reloadPlatforms,
+    reloadPluginMarket,
     reloadPlugins,
     reloadProviders,
     reloadSelectedPlugin,

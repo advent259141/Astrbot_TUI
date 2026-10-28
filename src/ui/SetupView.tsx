@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import type { I18n } from "../i18n/index.js";
+import {
+  DashboardSetupCompletedError,
+  DashboardSetupRequiredError,
+  isTotpRequiredError,
+} from "../auth/session.js";
 import { useTerminalSize } from "./appHelpers.js";
 import { clampCursor, editWindow, insertAtCursor, removeAtCursor } from "./dialogControls.js";
 import { truncateCells } from "./terminal.js";
@@ -9,11 +14,13 @@ export interface SetupValues {
   serverUrl: string;
   username: string;
   password: string;
+  confirmPassword?: string;
+  code?: string;
 }
 
-type FieldKey = "server" | "username" | "password";
+type FieldKey = "server" | "username" | "password" | "confirmPassword" | "code";
 
-const FIELD_ORDER: FieldKey[] = ["server", "username", "password"];
+const BASE_FIELD_ORDER: FieldKey[] = ["server", "username", "password"];
 
 interface FieldState {
   value: string;
@@ -22,11 +29,13 @@ interface FieldState {
 
 export function SetupView({
   i18n,
+  sessionExpired,
   defaultServerUrl,
   defaultUsername,
   onSubmit,
 }: {
   i18n: I18n;
+  sessionExpired?: boolean;
   defaultServerUrl: string;
   defaultUsername: string;
   onSubmit: (values: SetupValues) => Promise<void>;
@@ -37,14 +46,23 @@ export function SetupView({
     server: { value: defaultServerUrl, cursor: defaultServerUrl.length },
     username: { value: defaultUsername, cursor: defaultUsername.length },
     password: { value: "", cursor: 0 },
+    confirmPassword: { value: "", cursor: 0 },
+    code: { value: "", cursor: 0 },
   });
   const [focus, setFocus] = useState<FieldKey>("server");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [setupRequired, setSetupRequired] = useState(false);
+  const [totpRequired, setTotpRequired] = useState(false);
+  const fieldOrder = setupRequired
+    ? [...BASE_FIELD_ORDER, "confirmPassword" as const]
+    : totpRequired
+      ? [...BASE_FIELD_ORDER, "code" as const]
+      : BASE_FIELD_ORDER;
 
   const moveFocus = (delta: number) => {
-    const index = FIELD_ORDER.indexOf(focus);
-    const next = FIELD_ORDER[(index + delta + FIELD_ORDER.length) % FIELD_ORDER.length];
+    const index = fieldOrder.indexOf(focus);
+    const next = fieldOrder[(index + delta + fieldOrder.length) % fieldOrder.length];
     setFocus(next);
   };
 
@@ -57,15 +75,53 @@ export function SetupView({
       serverUrl: fields.server.value.trim(),
       username: fields.username.value.trim(),
       password: fields.password.value,
+      confirmPassword: setupRequired ? fields.confirmPassword.value : undefined,
+      code: totpRequired ? fields.code.value.trim() : undefined,
     };
     if (!values.serverUrl || !values.username) {
       setError(i18n.t("tui.cli.setup.fillAll", "Please fill in the server address and username."));
       return;
     }
+    if (!values.password) {
+      setError(i18n.t("features.auth.setup.validation.passwordRequired", "Enter a password."));
+      setFocus("password");
+      return;
+    }
+    if (setupRequired && values.password !== values.confirmPassword) {
+      setError(i18n.t("features.auth.setup.validation.passwordMatch", "Passwords do not match."));
+      setFocus("confirmPassword");
+      return;
+    }
+    if (totpRequired && !values.code) {
+      setError(i18n.t("tui.cli.setup.totpRequired", "Enter the TOTP or recovery code."));
+      setFocus("code");
+      return;
+    }
     setSubmitting(true);
     setError("");
     void onSubmit(values).catch((err: unknown) => {
-      setError(err instanceof Error ? err.message : String(err));
+      if (err instanceof DashboardSetupRequiredError) {
+        setSetupRequired(true);
+        setTotpRequired(false);
+        setFocus("confirmPassword");
+        setError(i18n.t(
+          "tui.cli.setup.firstAccount",
+          "This Dashboard has no account yet. Confirm the password to create its first account.",
+        ));
+      } else if (err instanceof DashboardSetupCompletedError) {
+        setSetupRequired(false);
+        setFocus("password");
+        setError(err.message);
+      } else if (isTotpRequiredError(err)) {
+        setTotpRequired(true);
+        setFocus("code");
+        setError(i18n.t(
+          "tui.cli.setup.totpRequired",
+          "This Dashboard requires a TOTP or recovery code.",
+        ));
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
       setSubmitting(false);
     });
   };
@@ -91,7 +147,7 @@ export function SetupView({
       return;
     }
     if (key.return) {
-      if (focus === "password") {
+      if (focus === fieldOrder[fieldOrder.length - 1]) {
         submit();
       } else {
         moveFocus(1);
@@ -128,14 +184,24 @@ export function SetupView({
     }
   });
 
-  const panelWidth = Math.max(40, Math.min(columns - 4, 72));
-  const fieldWidth = Math.max(10, panelWidth - 10);
+  const panelWidth = Math.max(1, Math.min(columns, 72));
+  const compactLayout = panelWidth < 40;
+  const horizontalPadding = compactLayout ? 0 : 2;
+  const fieldWidth = Math.max(1, panelWidth - (compactLayout ? 6 : 10));
+  const title = setupRequired
+    ? i18n.t("features.auth.setup.title", "Create the first Dashboard account")
+    : i18n.t("tui.cli.setup.welcome", "Welcome to AstrBot TUI");
+  const intro = setupRequired
+    ? i18n.t("features.auth.setup.subtitle", "Create the account used to manage AstrBot")
+    : sessionExpired
+      ? i18n.t("tui.cli.setup.sessionExpired", "The saved session expired. Sign in again.")
+      : i18n.t("tui.cli.setup.intro", "No saved session found. Let's connect to your AstrBot Dashboard.");
 
   return (
     <Box width={columns} height={rows} alignItems="center" justifyContent="center">
-      <Box flexDirection="column" width={panelWidth} borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
-        <Text bold color="cyan">{i18n.t("tui.cli.setup.welcome", "Welcome to AstrBot TUI")}</Text>
-        <Text dimColor>{i18n.t("tui.cli.setup.intro", "No saved session found. Let's connect to your AstrBot Dashboard.")}</Text>
+      <Box flexDirection="column" width={panelWidth} borderStyle="round" borderColor="cyan" paddingX={horizontalPadding} paddingY={1}>
+        <Text bold color="cyan">{title}</Text>
+        <Text dimColor>{intro}</Text>
         <Text> </Text>
         <Field
           label={i18n.t("tui.cli.setup.serverPrompt", "AstrBot Dashboard URL")}
@@ -145,20 +211,44 @@ export function SetupView({
           width={fieldWidth}
         />
         <Field
-          label={i18n.t("features.auth.username", "Username")}
+          label={setupRequired
+            ? i18n.t("tui.cli.setup.username", "Create the first Dashboard username")
+            : i18n.t("features.auth.username", "Username")}
           field={fields.username}
           focused={focus === "username"}
           disabled={submitting}
           width={fieldWidth}
         />
         <Field
-          label={i18n.t("features.auth.password", "Password")}
+          label={setupRequired
+            ? i18n.t("tui.cli.setup.password", "Choose a Dashboard password")
+            : i18n.t("features.auth.password", "Password")}
           field={fields.password}
           focused={focus === "password"}
           disabled={submitting}
           width={fieldWidth}
           mask
         />
+        {setupRequired && (
+          <Field
+            label={i18n.t("tui.cli.setup.confirmPassword", "Confirm new password")}
+            field={fields.confirmPassword}
+            focused={focus === "confirmPassword"}
+            disabled={submitting}
+            width={fieldWidth}
+            mask
+          />
+        )}
+        {totpRequired && (
+          <Field
+            label={i18n.t("tui.cli.setup.totpPrompt", "TOTP / recovery code")}
+            field={fields.code}
+            focused={focus === "code"}
+            disabled={submitting}
+            width={fieldWidth}
+            mask
+          />
+        )}
         <Text> </Text>
         {submitting ? (
           <Text color="yellow">
@@ -199,7 +289,7 @@ function Field({
     <Box flexDirection="column" marginBottom={1}>
       <Text color={focused ? "cyan" : "white"}>
         <Text color={pointerColor}>{focused ? "> " : "  "}</Text>
-        {label}
+        {truncateCells(label, Math.max(1, width + 2))}
       </Text>
       <Box>
         <Text color={pointerColor}>{"  | "}</Text>

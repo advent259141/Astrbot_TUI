@@ -14,8 +14,7 @@ export function truncateCells(value: string, width: number): string {
   }
   let result = "";
   let used = 0;
-  for (const char of value) {
-    const charWidth = charCellWidth(char);
+  for (const { segment: char, width: charWidth } of textCells(value)) {
     if (used + charWidth > width) {
       break;
     }
@@ -27,10 +26,20 @@ export function truncateCells(value: string, width: number): string {
 
 export function terminalWidth(value: string): number {
   let width = 0;
-  for (const char of value) {
-    width += charCellWidth(char);
+  for (const cell of textCells(value)) {
+    width += cell.width;
   }
   return width;
+}
+
+const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/** Measure complete graphemes so emoji sequences and combining marks stay intact. */
+export function textCells(value: string): Array<{ segment: string; width: number }> {
+  return Array.from(segmenter.segment(value), ({ segment }) => ({
+    segment,
+    width: /[\ufe0f\u20e3]/u.test(segment) ? 2 : Math.max(0, ...Array.from(segment, charCellWidth)),
+  }));
 }
 
 function charCellWidth(char: string): number {
@@ -39,7 +48,7 @@ function charCellWidth(char: string): number {
     code === 0 ||
     code < 32 ||
     (code >= 0x7f && code < 0xa0) ||
-    (code >= 0x300 && code <= 0x36f)
+    /[\p{Mark}\u200d\ufe0e\ufe0f]/u.test(char)
   ) {
     return 0;
   }

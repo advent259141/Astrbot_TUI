@@ -5,6 +5,7 @@ import type {
   AbconfInfo,
   AbconfListPayload,
   AbconfMutationPayload,
+  AuthSetupStatus,
   ChatSession,
   ChatSessionPayload,
   CommandsPayload,
@@ -61,8 +62,32 @@ export class DashboardClient {
     return new DashboardClient({ baseUrl: this.baseUrl, token });
   }
 
-  async login(username: string, password: string): Promise<LoginResponse> {
-    return this.post<LoginResponse>("/api/auth/login", { username, password });
+  async login(
+    username: string,
+    password: string,
+    code?: string,
+  ): Promise<LoginResponse> {
+    return this.post<LoginResponse>("/api/auth/login", {
+      username,
+      password,
+      ...(code ? { code } : {}),
+    });
+  }
+
+  async getAuthSetupStatus(): Promise<AuthSetupStatus> {
+    return this.get<AuthSetupStatus>("/api/auth/setup-status");
+  }
+
+  async setup(
+    username: string,
+    password: string,
+    confirmPassword: string,
+  ): Promise<LoginResponse> {
+    return this.post<LoginResponse>("/api/auth/setup", {
+      username,
+      password,
+      confirm_password: confirmPassword,
+    });
   }
 
   async logout(): Promise<void> {
@@ -73,10 +98,28 @@ export class DashboardClient {
     return this.get<ChatSession[]>("/api/chat/sessions");
   }
 
-  async getSession(sessionId: string): Promise<ChatSessionPayload> {
-    return this.get<ChatSessionPayload>("/api/chat/get_session", {
-      session_id: sessionId,
-    });
+  async getSession(
+    sessionId: string,
+    options: { page?: number; pageSize?: number } = {},
+  ): Promise<ChatSessionPayload> {
+    const path = `/api/v1/chat/sessions/${encodeURIComponent(sessionId)}`;
+    const query = {
+      page: options.page,
+      page_size: options.pageSize,
+    };
+    try {
+      return await this.get<ChatSessionPayload>(path, query);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 404) {
+        throw error;
+      }
+      if (options.page && options.page > 1) {
+        throw new ApiError("This Dashboard version does not support paginated chat history.", 404);
+      }
+      return this.get<ChatSessionPayload>("/api/chat/get_session", {
+        session_id: sessionId,
+      });
+    }
   }
 
   async newSession(): Promise<NewSessionPayload> {
@@ -118,33 +161,39 @@ export class DashboardClient {
         enable_streaming: true,
       }),
       headers: {
+        Accept: "text/event-stream",
         "Content-Type": "application/json",
       },
       signal: options.signal,
     });
+    yield* parseJsonEventSource<Record<string, unknown>>(
+      await this.requireEventStream(response, "POST", "/api/chat/send"),
+    );
+  }
 
-    const contentType = response.headers.get("content-type") || "";
-    if (!response.ok) {
-      throw new ApiError(
-        `Chat stream failed (POST /api/chat/send): HTTP ${response.status}`,
-        response.status,
-      );
-    }
-    if (!response.body || !contentType.includes("text/event-stream")) {
-      const payload = await response.json().catch(() => null);
-      throw new ApiError(
-        payload?.message || "Chat stream did not return an event stream.",
-        response.status,
-      );
-    }
-
-    yield* parseJsonEventSource<Record<string, unknown>>(response.body);
+  async *resumeChatRun(
+    runId: string,
+    options: { signal?: AbortSignal } = {},
+  ): AsyncGenerator<Record<string, unknown>> {
+    const path = `/api/v1/chat/runs/${encodeURIComponent(runId)}/stream`;
+    const response = await this.fetchRaw(path, {
+      method: "GET",
+      signal: options.signal,
+      headers: {
+        Accept: "text/event-stream",
+      },
+    });
+    yield* parseJsonEventSource<Record<string, unknown>>(
+      await this.requireEventStream(response, "GET", path),
+    );
   }
 
   async getStats(options: { offsetSec?: number } = {}): Promise<RuntimeStats> {
     return this.get<RuntimeStats>(
       "/api/stat/get",
-      options.offsetSec ? { offset_sec: options.offsetSec } : undefined,
+      options.offsetSec !== undefined
+        ? { offset_sec: options.offsetSec }
+        : undefined,
     );
   }
 
@@ -290,7 +339,7 @@ export class DashboardClient {
     });
   }
 
-  async getPersonas(folderId = ""): Promise<PersonaItem[]> {
+  async getPersonas(folderId?: string): Promise<PersonaItem[]> {
     return this.get<PersonaItem[]>("/api/persona/list", {
       folder_id: folderId,
     });
@@ -530,18 +579,15 @@ export class DashboardClient {
     options: { signal?: AbortSignal } = {},
   ): AsyncGenerator<LiveLogPayload> {
     const response = await this.fetchRaw("/api/live-log", {
+      method: "GET",
       signal: options.signal,
       headers: {
         Accept: "text/event-stream",
       },
     });
-    if (!response.ok || !response.body) {
-      throw new ApiError(
-        `Live log stream failed (GET /api/live-log): HTTP ${response.status}`,
-        response.status,
-      );
-    }
-    yield* parseJsonEventSource<LiveLogPayload>(response.body);
+    yield* parseJsonEventSource<LiveLogPayload>(
+      await this.requireEventStream(response, "GET", "/api/live-log"),
+    );
   }
 
   private async get<T>(
@@ -581,7 +627,7 @@ export class DashboardClient {
     });
   }
 
-  private async request<T>(
+  async request<T>(
     path: string,
     init: RequestInit & {
       query?: Record<string, string | number | boolean | null | undefined>;
@@ -599,18 +645,22 @@ export class DashboardClient {
     }
 
     if (!response.ok) {
-      const message =
-        payload && typeof payload === "object" && "message" in payload
-          ? String((payload as { message?: unknown }).message || "")
-          : "";
+      const envelope = payload as
+        | (Partial<ApiEnvelope<T>> & { error_code?: unknown })
+        | null;
+      const message = envelope?.message ? String(envelope.message) : "";
       throw new ApiError(
         message ||
           `Dashboard request failed (${init.method || "GET"} ${path}): HTTP ${response.status}`,
         response.status,
+        envelope?.data,
+        typeof envelope?.error_code === "string"
+          ? envelope.error_code
+          : undefined,
       );
     }
 
-    return unwrapApiEnvelope<T>(payload);
+    return unwrapApiEnvelope<T>(payload, response.status);
   }
 
   private async requestEnvelope<T>(
@@ -631,26 +681,40 @@ export class DashboardClient {
     }
 
     if (!response.ok) {
-      const message =
-        payload && typeof payload === "object" && "message" in payload
-          ? String((payload as { message?: unknown }).message || "")
-          : "";
+      const envelope = payload as
+        | (Partial<ApiEnvelope<T>> & { error_code?: unknown })
+        | null;
+      const message = envelope?.message ? String(envelope.message) : "";
       throw new ApiError(
         message ||
           `Dashboard request failed (${init.method || "GET"} ${path}): HTTP ${response.status}`,
         response.status,
+        envelope?.data,
+        typeof envelope?.error_code === "string"
+          ? envelope.error_code
+          : undefined,
       );
     }
 
     if (!payload || typeof payload !== "object") {
-      throw new ApiError("Invalid Dashboard response.");
+      throw new ApiError("Invalid Dashboard response.", response.status);
     }
-    const envelope = payload as Partial<ApiEnvelope<T>>;
+    const envelope = payload as Partial<ApiEnvelope<T>> & {
+      error_code?: unknown;
+    };
     if (envelope.status === "error") {
-      throw new ApiError(envelope.message || "Dashboard request failed.");
+      throw new ApiError(
+        envelope.message || "Dashboard request failed.",
+        response.status,
+        envelope.data,
+        typeof envelope.error_code === "string" ? envelope.error_code : undefined,
+      );
     }
     if (envelope.status !== "ok" && envelope.status !== "warning") {
-      throw new ApiError("Unexpected Dashboard response status.");
+      throw new ApiError(
+        "Unexpected Dashboard response status.",
+        response.status,
+      );
     }
     return {
       status: envelope.status,
@@ -665,8 +729,14 @@ export class DashboardClient {
       query?: Record<string, string | number | boolean | null | undefined>;
     } = {},
   ): Promise<Response> {
-    const url = new URL(path, this.baseUrl);
-    for (const [key, value] of Object.entries(init.query || {})) {
+    const url = new URL(this.baseUrl);
+    const basePath = url.pathname.replace(/\/+$/, "");
+    const requestPath = path.replace(/^\/+/, "");
+    url.pathname = `${basePath}/${requestPath}`.replace(/\/{2,}/g, "/");
+    url.search = "";
+    url.hash = "";
+    const { query, ...fetchInit } = init;
+    for (const [key, value] of Object.entries(query || {})) {
       if (value === null || value === undefined) {
         continue;
       }
@@ -680,7 +750,7 @@ export class DashboardClient {
 
     try {
       return await fetch(url, {
-        ...init,
+        ...fetchInit,
         headers,
       });
     } catch (error) {
@@ -691,5 +761,28 @@ export class DashboardClient {
         `Request failed (${init.method || "GET"} ${url.pathname}): ${messageFromUnknown(error)}`,
       );
     }
+  }
+
+  private async requireEventStream(
+    response: Response,
+    method: string,
+    path: string,
+  ): Promise<ReadableStream<Uint8Array>> {
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+    if (response.ok && response.body && contentType.includes("text/event-stream")) {
+      return response.body;
+    }
+
+    const payload = await response.json().catch(() => null);
+    const envelope = payload as
+      | (Partial<ApiEnvelope<unknown>> & { error_code?: unknown })
+      | null;
+    throw new ApiError(
+      (envelope?.message && String(envelope.message)) ||
+        `Dashboard stream failed (${method} ${path}): HTTP ${response.status}`,
+      response.status,
+      envelope?.data,
+      typeof envelope?.error_code === "string" ? envelope.error_code : undefined,
+    );
   }
 }

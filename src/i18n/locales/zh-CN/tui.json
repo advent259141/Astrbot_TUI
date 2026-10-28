@@ -30,7 +30,15 @@
       "streaming": "回复中",
       "streamingResponse": "正在流式回复...",
       "title": "AstrBot 聊天",
-      "workspace": "聊天工作区"
+      "workspace": "聊天工作区",
+      "commands": "/new 新建 · /rename 名称 · /delete 删除 · /stop 停止 · /older 历史 · /refresh 刷新 · /search 筛选 · /help",
+      "helpHint": "/help 聊天操作",
+      "resuming": "正在恢复运行中的回复...",
+      "stopped": "回复已停止。",
+      "renameHint": "输入 /rename 名称 来重命名当前聊天。",
+      "deleted": "聊天已删除。",
+      "confirmDelete": "删除「{name}」及其历史？输入 /delete confirm 确认。",
+      "noOlder": "没有更早的历史消息。"
     },
     "cli": {
       "description": "AstrBot Dashboard 终端工作台",
@@ -45,7 +53,8 @@
         "failed": "登录失败：{error}",
         "options": {
           "passwordStdin": "从 stdin 读取 Dashboard 密码",
-          "username": "Dashboard 用户名"
+          "username": "Dashboard 用户名",
+          "code": "两步验证码或恢复码"
         },
         "success": "已登录为 {username}，Token 已保存到 {kind}。"
       },
@@ -67,7 +76,14 @@
         "cancelled": "已取消初始化。",
         "hint": "Tab / ↑↓ 切换字段   Enter 下一项/连接   Esc 退出",
         "connect": "连接",
-        "fillAll": "请填写服务器地址和用户名。"
+        "fillAll": "请填写服务器地址和用户名。",
+        "firstAccount": "此 Dashboard 尚未创建账户。请确认密码以创建首个账户。",
+        "confirmPassword": "确认密码",
+        "username": "创建首个 Dashboard 用户名",
+        "password": "设置 Dashboard 密码",
+        "totpRequired": "此 Dashboard 需要两步验证码或恢复码。",
+        "totpPrompt": "请输入两步验证码或恢复码。",
+        "sessionExpired": "保存的登录已过期，请重新登录。"
       },
       "status": {
         "description": "检查已保存会话和 Dashboard 版本"
@@ -186,11 +202,11 @@
       "fileActionCanceled": "操作已取消。",
       "footer": {
         "fileActions": "{action}  Enter 执行操作。下键返回文件。Esc 关闭。",
-        "fileButton": "Enter ??????????????",
+        "fileButton": "Enter 打开配置管理。左键返回系统配置。",
         "files": "{name}  Enter 加载。右键编辑设置，上键打开操作。Esc 关闭。",
         "setting": "{name}  Enter 编辑并保存。",
         "settings": "Enter 编辑选中的配置项。左键返回。",
-        "tabs": "?/?????/??/?????Enter ???"
+        "tabs": "左右键切换普通/系统/配置。Enter 打开。"
       },
       "loaded": "已加载配置 {name}。",
       "loadedSystem": "已加载系统配置。",
@@ -200,7 +216,7 @@
       },
       "nameHint": "使用短名称显示在配置列表中。",
       "newConfigHint": "从默认配置创建。",
-      "noFiles": "?????",
+      "noFiles": "暂无配置。",
       "noSettings": "没有配置项。",
       "renamed": "已重命名配置。",
       "source": "来源",
@@ -500,7 +516,10 @@
       "loadingConfig": "正在加载插件 {name} 配置...",
       "loadingConfigPlain": "正在加载插件配置...",
       "loadingDetail": "正在加载插件 {name} 详情...",
+      "loadingMarket": "正在加载市场插件...",
       "market": "市场",
+      "marketLoaded": "已加载市场插件。",
+      "marketLoadFailed": "加载市场插件失败。",
       "marketMatched": "匹配 {shown}/{total}",
       "marketSearchHint": "输入插件名、作者、分类、标签或仓库。",
       "marketSearchHintShort": "输入内容过滤。",
@@ -734,6 +753,9 @@
       "summary": "运行、消息、平台流量和模型调用。",
       "title": "系统统计",
       "updated": "更新时间"
+    },
+    "management": {
+      "title": "管理"
     }
   }
 }

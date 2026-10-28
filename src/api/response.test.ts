@@ -13,13 +13,22 @@ describe("unwrapApiEnvelope", () => {
   });
 
   it("throws the dashboard message for error responses", () => {
-    expect(() =>
+    let thrown: unknown;
+    try {
       unwrapApiEnvelope({
         status: "error",
         message: "bad credentials",
-        data: {},
-      }),
-    ).toThrow(new ApiError("bad credentials"));
+        data: { totp_required: true },
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(ApiError);
+    expect(thrown).toMatchObject({
+      message: "bad credentials",
+      data: { totp_required: true },
+    });
   });
 
   it("returns data for warning responses", () => {

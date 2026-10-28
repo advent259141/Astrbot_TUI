@@ -1,3 +1,5 @@
+import { ApiError } from "./errors.js";
+
 export interface SseEvent {
   id?: string;
   event?: string;
@@ -8,15 +10,19 @@ export function parseSseBlock(block: string): SseEvent | null {
   const event: SseEvent = { data: "" };
   const dataLines: string[] = [];
 
-  for (const rawLine of block.replace(/\r\n/g, "\n").split("\n")) {
-    if (!rawLine || rawLine.startsWith(":")) {
+  for (const [lineIndex, rawLine] of block
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .entries()) {
+    const line = lineIndex === 0 ? rawLine.replace(/^\uFEFF/, "") : rawLine;
+    if (!line || line.startsWith(":")) {
       continue;
     }
 
-    const separatorIndex = rawLine.indexOf(":");
+    const separatorIndex = line.indexOf(":");
     const field =
-      separatorIndex >= 0 ? rawLine.slice(0, separatorIndex) : rawLine;
-    let value = separatorIndex >= 0 ? rawLine.slice(separatorIndex + 1) : "";
+      separatorIndex >= 0 ? line.slice(0, separatorIndex) : line;
+    let value = separatorIndex >= 0 ? line.slice(separatorIndex + 1) : "";
     if (value.startsWith(" ")) {
       value = value.slice(1);
     }
@@ -44,35 +50,70 @@ export async function* parseEventSource(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let eventLines: string[] = [];
+  let streamDone = false;
 
   try {
-    while (true) {
+    while (!streamDone) {
       const { value, done } = await reader.read();
-      if (done) {
-        break;
+      if (value) {
+        buffer += decoder.decode(value, { stream: true });
       }
+      streamDone = done;
 
-      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-      const blocks = buffer.split("\n\n");
-      buffer = blocks.pop() || "";
+      while (true) {
+        const lineFeedIndex = buffer.indexOf("\n");
+        const carriageReturnIndex = buffer.indexOf("\r");
+        let lineEndIndex: number;
+        if (lineFeedIndex < 0) {
+          lineEndIndex = carriageReturnIndex;
+        } else if (carriageReturnIndex < 0) {
+          lineEndIndex = lineFeedIndex;
+        } else {
+          lineEndIndex = Math.min(lineFeedIndex, carriageReturnIndex);
+        }
 
-      for (const block of blocks) {
-        const event = parseSseBlock(block);
-        if (event) {
-          yield event;
+        if (lineEndIndex < 0) {
+          break;
+        }
+        if (
+          buffer[lineEndIndex] === "\r" &&
+          lineEndIndex === buffer.length - 1 &&
+          !streamDone
+        ) {
+          break;
+        }
+
+        const line = buffer.slice(0, lineEndIndex);
+        const separatorLength =
+          buffer[lineEndIndex] === "\r" && buffer[lineEndIndex + 1] === "\n"
+            ? 2
+            : 1;
+        buffer = buffer.slice(lineEndIndex + separatorLength);
+        if (line === "") {
+          const event = parseSseBlock(eventLines.join("\n"));
+          eventLines = [];
+          if (event) {
+            yield event;
+          }
+        } else {
+          eventLines.push(line);
         }
       }
     }
 
     buffer += decoder.decode();
-    const trailing = buffer.trim();
+    if (buffer) {
+      eventLines.push(buffer);
+    }
+    const trailing = parseSseBlock(eventLines.join("\n"));
     if (trailing) {
-      const event = parseSseBlock(trailing);
-      if (event) {
-        yield event;
-      }
+      yield trailing;
     }
   } finally {
+    if (!streamDone) {
+      await reader.cancel().catch(() => undefined);
+    }
     reader.releaseLock();
   }
 }
@@ -84,6 +125,13 @@ export async function* parseJsonEventSource<T = unknown>(
     if (!event.data.trim()) {
       continue;
     }
-    yield JSON.parse(event.data) as T;
+    try {
+      yield JSON.parse(event.data) as T;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new ApiError(`Invalid JSON in event stream: ${error.message}`);
+      }
+      throw error;
+    }
   }
 }

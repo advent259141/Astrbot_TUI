@@ -18,7 +18,8 @@ export type MainView =
   | "agents"
   | "config"
   | "providers"
-  | "platforms";
+  | "platforms"
+  | "management";
 
 export type PendingProviderDelete =
   | { kind: "source"; id: string }
@@ -139,6 +140,7 @@ export const MAIN_VIEWS: MainView[] = [
   "config",
   "providers",
   "platforms",
+  "management",
 ];
 export const AGENT_ACTIONS: AgentAction[] = ["delete"];
 export const AGENT_EDIT_ACTIONS: AgentAction[] = ["save", "cancel"];

@@ -22,6 +22,7 @@ import {
   togglePluginChoiceValue,
 } from "./appHelpers.js";
 import { insertAtCursor, removeAtCursor } from "./dialogControls.js";
+import { textCells } from "./terminal.js";
 import type {
   AgentsState,
   ChatState,
@@ -325,6 +326,11 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
     selectedConfigGroups.length > 1 ? "groups" : "tabs";
     if (key.ctrl && value === "c") {
       exit();
+      return;
+    }
+    if (ctx.isBootLoading) return;
+    if (activeView === "management") {
+      if (key.tab) setActiveView((current) => nextMainView(current, key.shift ? -1 : 1));
       return;
     }
     if (pendingMarketInstallWarning) {
@@ -1288,7 +1294,11 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
       }
     }
     if (key.tab) {
-      setActiveView((current) => nextMainView(current));
+      setActiveView((current) => nextMainView(current, key.shift ? -1 : 1));
+      return;
+    }
+    if (key.ctrl && value === "r") {
+      void ctx.refreshAll();
       return;
     }
     if (key.upArrow) {
@@ -2581,7 +2591,7 @@ export function handleInput(value: string, key: Key, ctx: InputContext) {
       return;
     }
     if (key.backspace || key.delete) {
-      setInput((current) => current.slice(0, -1));
+      setInput((current) => textCells(current).slice(0, -1).map((cell) => cell.segment).join(""));
       return;
     }
     if (!key.ctrl && value) {

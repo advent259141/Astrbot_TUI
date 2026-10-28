@@ -8,6 +8,7 @@ import type {
 } from "../api/types.js";
 import { textFromParts } from "../api/messages.js";
 import type { I18n } from "../i18n/index.js";
+import { terminalWidth, textCells, truncateCells } from "./terminal.js";
 
 export function sessionTitle(session: ChatSession): string {
   return (
@@ -77,27 +78,31 @@ export function truncate(value: string, width: number): string {
   if (width <= 0) {
     return "";
   }
-  if (value.length <= width) {
+  if (terminalWidth(value) <= width) {
     return value;
   }
   if (width <= 3) {
     return ".".repeat(width);
   }
-  return `${value.slice(0, width - 3)}...`;
+  return `${truncateCells(value, width - 3)}...`;
 }
 
 export function wrapText(value: string, width: number): string[] {
-  if (width <= 4) {
-    return [value];
-  }
+  if (width <= 0) return [""];
   const lines: string[] = [];
   for (const paragraph of value.split("\n")) {
-    let remaining = paragraph;
-    while (remaining.length > width) {
-      lines.push(remaining.slice(0, width));
-      remaining = remaining.slice(width);
+    let line = "";
+    let used = 0;
+    for (const cell of textCells(paragraph)) {
+      if (used + cell.width > width && line) {
+        lines.push(line);
+        line = "";
+        used = 0;
+      }
+      line += cell.segment;
+      used += cell.width;
     }
-    lines.push(remaining);
+    lines.push(line);
   }
   return lines;
 }

@@ -35,7 +35,6 @@ import type {
   PluginDetail,
   PluginItem,
   PluginMarketItem,
-  PluginMarketPayload,
   ProviderCheckResult,
   ProviderConfig,
   ProviderSourceConfig,
@@ -60,10 +59,12 @@ import { PluginsView } from "./PluginsView.js";
 import { ProvidersView } from "./ProvidersView.js";
 import { SplashView } from "./SplashView.js";
 import { StatusView } from "./StatusView.js";
+import { ManagementView } from "./ManagementView.js";
 import {
   padRightCells,
   terminalWidth,
   truncateCells,
+  textCells,
 } from "./terminal.js";
 import {
   DialogContentLine,
@@ -110,6 +111,7 @@ import {
   isPlatformLoggedIn,
   useTerminalSize,
   viewLabel,
+  visibleMainViews,
 } from "./appHelpers.js";
 import {
   AgentFieldDialog,
@@ -202,6 +204,8 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     setPlugins,
     marketPlugins,
     setMarketPlugins,
+    marketStatus,
+    setMarketStatus,
     pluginDetails,
     setPluginDetails,
     pluginConfigs,
@@ -480,6 +484,7 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     marketFilter,
     marketFilterCursor,
     marketPlugins,
+    marketStatus,
     messageScrollOffset,
     messages,
     pendingMarketInstallWarning,
@@ -603,6 +608,7 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
     setMarketFilter,
     setMarketFilterCursor,
     setMarketPlugins,
+    setMarketStatus,
     setMessageScrollOffset,
     setMessages,
     setNotice,
@@ -806,12 +812,12 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
           <Text dimColor>{truncate(headerMeta, Math.max(10, columns - 10))}</Text>
         </Box>
         <Box>
-          {MAIN_VIEWS.map((view) => (
+          {visibleMainViews(activeView, Math.max(12, columns - 23), i18n).map((view) => (
             <Text key={view} color={activeView === view ? "cyan" : undefined} inverse={activeView === view}>
               {`  ${viewLabel(view, i18n)}  `}
             </Text>
           ))}
-          <Text dimColor>{`    ${i18n.t("tui.keys.tabSwitch", "Tab switch")}`}</Text>
+          <Text dimColor>{` ${MAIN_VIEWS.indexOf(activeView) + 1}/${MAIN_VIEWS.length}  ${i18n.t("tui.keys.tabSwitch", "Tab switch")}`}</Text>
         </Box>
       </Box>
 
@@ -832,6 +838,7 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
         ) : null}
 
         <Box width={layout.mainWidth} height={layout.bodyHeight} flexDirection="column" paddingX={2}>
+          <ManagementView client={client} width={layout.contentWidth} height={layout.bodyHeight} i18n={i18n} active={activeView === "management"} />
           {activeView === "chat" ? (
             <ChatView
               title={currentSessionTitle}
@@ -904,6 +911,7 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
               loadingPluginConfigName={loadingPluginConfigName}
               editingPluginConfigSettingKey={editingPluginConfigSettingKey}
               marketPlugins={filteredMarketPlugins}
+              marketStatus={marketStatus}
               marketTotalCount={marketPlugins.length}
               marketFilter={marketFilter}
               isEditingMarketFilter={isEditingMarketFilter}
@@ -1031,7 +1039,7 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
       {showChatSidebar ? (
         <Box height={3}>
           <Box width={layout.sidebarWidth} paddingX={1}>
-            <Text dimColor>{truncate(i18n.t("tui.chat.workspace", "Chat workspace"), layout.sidebarWidth - 2)}</Text>
+            <Text dimColor>{truncate(i18n.t("tui.chat.helpHint", "/help for chat actions"), layout.sidebarWidth - 2)}</Text>
           </Box>
 
           <Box
@@ -1041,7 +1049,15 @@ export function App({ client, serverUrl, username, tokenStoreKind, locale }: App
             paddingX={1}
           >
             <Text color="green">{"> "}</Text>
-            <Text>{input}</Text>
+            <Text>{(() => {
+              const cells = textCells(input.replace(/[\r\n\t]/g, " "));
+              let used = 0;
+              let start = cells.length;
+              while (start > 0 && used + cells[start - 1].width <= Math.max(1, layout.mainWidth - 8)) {
+                used += cells[--start].width;
+              }
+              return cells.slice(start).map((cell) => cell.segment).join("");
+            })()}</Text>
             <Text inverse> </Text>
           </Box>
         </Box>

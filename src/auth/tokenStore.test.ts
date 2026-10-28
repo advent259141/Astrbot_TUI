@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -16,7 +16,8 @@ afterEach(async () => {
 
 describe("FileTokenStore", () => {
   it("stores tokens by server URL", async () => {
-    const store = new FileTokenStore(join(tempDir, "tokens.json"));
+    const filePath = join(tempDir, "tokens.json");
+    const store = new FileTokenStore(filePath);
     await store.set("http://localhost:6185", "token-a");
     await store.set("http://localhost:7000", "token-b");
 
@@ -25,6 +26,38 @@ describe("FileTokenStore", () => {
 
     await store.delete("http://localhost:6185");
     expect(await store.get("http://localhost:6185")).toBeNull();
+    expect(JSON.parse(await readFile(filePath, "utf8"))).toEqual({
+      "http://localhost:7000": "token-b",
+    });
+    if (process.platform !== "win32") {
+      expect((await stat(filePath)).mode & 0o777).toBe(0o600);
+    }
+  });
+
+  it("rejects a malformed token file instead of overwriting stored data", async () => {
+    const filePath = join(tempDir, "tokens.json");
+    await writeFile(filePath, "[]", "utf8");
+    const store = new FileTokenStore(filePath);
+
+    await expect(store.get("http://localhost:6185")).rejects.toThrow(
+      "Invalid token store format",
+    );
+    await expect(store.set("http://localhost:6185", "token-a")).rejects.toThrow(
+      "Invalid token store format",
+    );
+    expect(await readFile(filePath, "utf8")).toBe("[]");
+  });
+
+  it("finds legacy tokens across equivalent host casing and default ports", async () => {
+    const filePath = join(tempDir, "tokens.json");
+    await writeFile(filePath, JSON.stringify({ "http://LOCALHOST:80/": "legacy-token" }), "utf8");
+    const store = new FileTokenStore(filePath);
+
+    expect(await store.get("http://localhost")).toBe("legacy-token");
+    await store.set("http://localhost", "renewed-token");
+    expect(JSON.parse(await readFile(filePath, "utf8"))).toEqual({
+      "http://localhost": "renewed-token",
+    });
   });
 });
 

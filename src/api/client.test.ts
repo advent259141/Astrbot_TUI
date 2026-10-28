@@ -30,6 +30,83 @@ describe("DashboardClient", () => {
     );
   });
 
+  it("sends an optional login code without changing the password payload", async () => {
+    mockFetchJson({
+      status: "ok",
+      data: { token: "jwt", username: "astrbot" },
+    });
+
+    const client = new DashboardClient({ baseUrl: "http://localhost:6185" });
+    await client.login("astrbot", "secret", "123456");
+
+    expect(fetch).toHaveBeenCalledWith(
+      new URL("http://localhost:6185/api/auth/login"),
+      expect.objectContaining({
+        body: JSON.stringify({
+          username: "astrbot",
+          password: "secret",
+          code: "123456",
+        }),
+      }),
+    );
+  });
+
+  it("reads setup status and creates the first dashboard account", async () => {
+    mockFetchJson({
+      status: "ok",
+      data: {
+        setup_required: true,
+        skip_default_password_auth: true,
+      },
+    });
+
+    const client = new DashboardClient({ baseUrl: "http://localhost:6185" });
+    await expect(client.getAuthSetupStatus()).resolves.toMatchObject({
+      setup_required: true,
+      skip_default_password_auth: true,
+    });
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/auth/setup-status"),
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    mockFetchJson({
+      status: "ok",
+      data: { token: "jwt", username: "astrbot" },
+    });
+    await expect(
+      client.setup("astrbot", "strong-secret", "strong-secret"),
+    ).resolves.toMatchObject({ token: "jwt", username: "astrbot" });
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/auth/setup"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          username: "astrbot",
+          password: "strong-secret",
+          confirm_password: "strong-secret",
+        }),
+      }),
+    );
+  });
+
+  it("keeps structured error data for authentication flows", async () => {
+    mockFetchJson(
+      {
+        status: "error",
+        message: "需要 TOTP 验证",
+        data: { totp_required: true },
+      },
+      401,
+    );
+
+    const client = new DashboardClient({ baseUrl: "http://localhost:6185" });
+    await expect(client.login("astrbot", "secret")).rejects.toMatchObject({
+      statusCode: 401,
+      data: { totp_required: true },
+    });
+  });
+
   it("sends bearer tokens on authenticated requests", async () => {
     mockFetchJson({
       status: "ok",
@@ -50,6 +127,106 @@ describe("DashboardClient", () => {
     );
   });
 
+  it("keeps a reverse-proxy base path and exposes request for API extensions", async () => {
+    mockFetchJson({ status: "ok", data: { enabled: true } });
+
+    const client = new DashboardClient({
+      baseUrl: "http://localhost:6185/astrbot/proxy/",
+      token: "jwt",
+    });
+    await expect(
+      client.request<{ enabled: boolean }>("/api/custom", {
+        method: "GET",
+        query: { page: 2, ignored: null },
+      }),
+    ).resolves.toEqual({ enabled: true });
+
+    expect(fetch).toHaveBeenCalledWith(
+      new URL("http://localhost:6185/astrbot/proxy/api/custom?page=2"),
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(vi.mocked(fetch).mock.calls[0]?.[1]).not.toHaveProperty("query");
+  });
+
+  it("loads paginated chat sessions from the v1 API", async () => {
+    mockFetchJson({
+      status: "ok",
+      data: {
+        session: { session_id: "s1", platform_id: "webchat" },
+        history: [{ id: 2, content: { type: "message", message: [] } }],
+        total: 75,
+        page: 2,
+        page_size: 50,
+        has_more: true,
+        active_runs: [{ run_id: "r1", session_id: "s1", status: "running" }],
+      },
+    });
+
+    const client = new DashboardClient({ baseUrl: "http://localhost:6185" });
+    await expect(client.getSession("s1", { page: 2, pageSize: 50 })).resolves.toMatchObject({
+      total: 75,
+      page: 2,
+      page_size: 50,
+      has_more: true,
+      active_runs: [{ run_id: "r1", session_id: "s1", status: "running" }],
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      new URL("http://localhost:6185/api/v1/chat/sessions/s1?page=2&page_size=50"),
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("falls back to the legacy session endpoint only when v1 returns 404", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ status: "error", message: "Not found", data: null }),
+          {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: "ok",
+            data: { history: [], is_running: false },
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new DashboardClient({ baseUrl: "http://localhost:6185" });
+    await expect(client.getSession("s1", { page: 1, pageSize: 50 })).resolves.toEqual({
+      history: [],
+      is_running: false,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toEqual(
+      new URL("http://localhost:6185/api/v1/chat/sessions/s1?page=1&page_size=50"),
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toEqual(
+      new URL("http://localhost:6185/api/chat/get_session?session_id=s1"),
+    );
+  });
+
+  it("does not fall back to the legacy session endpoint for other errors", async () => {
+    mockFetchJson(
+      { status: "error", message: "Service unavailable", data: null },
+      503,
+    );
+
+    const client = new DashboardClient({ baseUrl: "http://localhost:6185" });
+    await expect(client.getSession("s1")).rejects.toMatchObject({
+      statusCode: 503,
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("streams chat SSE payloads", async () => {
     mockFetchStream(
       [
@@ -57,7 +234,7 @@ describe("DashboardClient", () => {
         "data: {\"type\":\"plain\",\"data\":\"hi\"}\n\n",
         "data: {\"type\":\"end\"}\n\n",
       ],
-      "text/event-stream",
+      "Text/Event-Stream; charset=utf-8",
     );
 
     const client = new DashboardClient({
@@ -74,6 +251,51 @@ describe("DashboardClient", () => {
       { type: "plain", data: "hi" },
       { type: "end" },
     ]);
+  });
+
+  it("resumes a chat run from the upstream SSE endpoint", async () => {
+    mockFetchStream(
+      ["data: {\"type\":\"plain\",\"data\":\"restored\"}\n\n"],
+      "text/event-stream",
+    );
+
+    const client = new DashboardClient({
+      baseUrl: "http://localhost:6185/astrbot",
+      token: "jwt",
+    });
+    const payloads = [];
+    for await (const payload of client.resumeChatRun("run/one")) {
+      payloads.push(payload);
+    }
+
+    expect(payloads).toEqual([{ type: "plain", data: "restored" }]);
+    expect(fetch).toHaveBeenCalledWith(
+      new URL("http://localhost:6185/astrbot/api/v1/chat/runs/run%2Fone/stream"),
+      expect.objectContaining({ method: "GET" }),
+    );
+    const requestInit = vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit;
+    expect(new Headers(requestInit.headers).get("Accept")).toBe("text/event-stream");
+    expect(new Headers(requestInit.headers).get("Authorization")).toBe(
+      "Bearer jwt",
+    );
+  });
+
+  it("preserves structured errors when an SSE endpoint cannot resume a run", async () => {
+    mockFetchJson(
+      {
+        status: "error",
+        message: "Chat run is unavailable",
+        data: { run_id: "missing" },
+      },
+      404,
+    );
+
+    const client = new DashboardClient({ baseUrl: "http://localhost:6185" });
+    await expect(client.resumeChatRun("missing").next()).rejects.toMatchObject({
+      message: "Chat run is unavailable",
+      statusCode: 404,
+      data: { run_id: "missing" },
+    });
   });
 
   it("streams live log payloads", async () => {
@@ -222,7 +444,7 @@ describe("DashboardClient", () => {
       status: "ok",
       data: [{ persona_id: "default" }],
     });
-    await expect(client.getPersonas()).resolves.toEqual([
+    await expect(client.getPersonas("")).resolves.toEqual([
       { persona_id: "default" },
     ]);
     expect(fetch).toHaveBeenLastCalledWith(
@@ -232,13 +454,35 @@ describe("DashboardClient", () => {
 
     mockFetchJson({
       status: "ok",
-      data: { items: [{ name: "docs" }] },
+      data: {
+        items: [{ kb_id: "kb1", kb_name: "docs", doc_count: 2 }],
+        page: 1,
+        page_size: 100,
+        total: 1,
+      },
     });
     await expect(client.getKnowledgeBases()).resolves.toEqual({
-      items: [{ name: "docs" }],
+      items: [{ kb_id: "kb1", kb_name: "docs", doc_count: 2 }],
+      page: 1,
+      page_size: 100,
+      total: 1,
     });
     expect(fetch).toHaveBeenLastCalledWith(
       new URL("http://localhost:6185/api/kb/list?page=1&page_size=100"),
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("omits folder_id when loading personas from all folders", async () => {
+    mockFetchJson({ status: "ok", data: [{ persona_id: "nested" }] });
+
+    const client = new DashboardClient({ baseUrl: "http://localhost:6185" });
+    await expect(client.getPersonas()).resolves.toEqual([
+      { persona_id: "nested" },
+    ]);
+
+    expect(fetch).toHaveBeenCalledWith(
+      new URL("http://localhost:6185/api/persona/list"),
       expect.objectContaining({ method: "GET" }),
     );
   });
@@ -322,6 +566,94 @@ describe("DashboardClient", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ persona_id: "assistant" }),
+      }),
+    );
+  });
+
+  it("creates and updates provider sources through the legacy upsert contract", async () => {
+    const client = new DashboardClient({ baseUrl: "http://localhost:6185" });
+    const source = {
+      id: "openai-source",
+      type: "openai_chat_completion",
+      api_base: "https://api.example.com/v1",
+    };
+
+    mockFetchJson({ status: "ok", data: "updated" });
+    await expect(
+      client.updateProviderSource(source.id, source),
+    ).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/config/provider_sources/update"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ original_id: source.id, config: source }),
+      }),
+    );
+
+    mockFetchJson({ status: "ok", data: "deleted" });
+    await expect(
+      client.deleteProviderSource(source.id),
+    ).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/config/provider_sources/delete"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ id: source.id }),
+      }),
+    );
+  });
+
+  it("loads command and tool state, including readonly tool flags", async () => {
+    const client = new DashboardClient({ baseUrl: "http://localhost:6185" });
+
+    mockFetchJson({
+      status: "ok",
+      data: {
+        items: [{ handler_full_name: "plugin.cmd", enabled: false }],
+        summary: { total: 1, disabled: 1, conflicts: 0 },
+        wake_prefix: "/",
+      },
+    });
+    await expect(client.getCommands()).resolves.toMatchObject({
+      items: [{ handler_full_name: "plugin.cmd", enabled: false }],
+      wake_prefix: "/",
+    });
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/commands"),
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    mockFetchJson({
+      status: "ok",
+      data: [{ name: "builtin.echo", active: true, readonly: true }],
+    });
+    await expect(client.getTools()).resolves.toEqual([
+      { name: "builtin.echo", active: true, readonly: true },
+    ]);
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/tools/list"),
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    mockFetchJson({ status: "ok", data: { handler_full_name: "plugin.cmd" } });
+    await expect(client.toggleCommand("plugin.cmd", true)).resolves.toEqual({
+      handler_full_name: "plugin.cmd",
+    });
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/commands/toggle"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ handler_full_name: "plugin.cmd", enabled: true }),
+      }),
+    );
+
+    mockFetchJson({ status: "ok", data: "updated" });
+    await expect(client.toggleTool("custom.tool", false)).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("http://localhost:6185/api/tools/toggle-tool"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ name: "custom.tool", activate: false }),
       }),
     );
   });

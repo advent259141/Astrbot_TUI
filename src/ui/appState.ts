@@ -146,6 +146,8 @@ export function useCommandsState() {
 export function usePluginsState() {
   const [plugins, setPlugins] = useState<PluginItem[]>([]);
   const [marketPlugins, setMarketPlugins] = useState<PluginMarketItem[]>([]);
+  const [marketStatus, setMarketStatus] =
+    useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [pluginDetails, setPluginDetails] = useState<Record<string, PluginDetail>>({});
   const [pluginConfigs, setPluginConfigs] = useState<Record<string, PluginConfigPayload>>({});
   const [pluginTab, setPluginTab] = useState<PluginTab>("installed");
@@ -188,6 +190,8 @@ export function usePluginsState() {
     setPlugins,
     marketPlugins,
     setMarketPlugins,
+    marketStatus,
+    setMarketStatus,
     pluginDetails,
     setPluginDetails,
     pluginConfigs,

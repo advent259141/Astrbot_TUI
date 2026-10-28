@@ -5,7 +5,7 @@ import { input, password } from "@inquirer/prompts";
 import { render } from "ink";
 import { App } from "../ui/App.js";
 import { SetupView, type SetupValues } from "../ui/SetupView.js";
-import { messageFromUnknown } from "../api/errors.js";
+import { ApiError, messageFromUnknown } from "../api/errors.js";
 import type { I18n } from "../i18n/index.js";
 import {
   loadProfile,
@@ -14,8 +14,11 @@ import {
 } from "../config/index.js";
 import { createI18n } from "../i18n/index.js";
 import {
+  isServerSetupRequired,
+  isTotpRequiredError,
   getAuthenticatedClient,
   login as loginSession,
+  NoStoredTokenError,
   logout as logoutSession,
 } from "../auth/session.js";
 
@@ -27,6 +30,7 @@ interface RootOptions {
 interface LoginCommandOptions extends RootOptions {
   username?: string;
   passwordStdin?: boolean;
+  code?: string;
 }
 
 const program = new Command();
@@ -51,43 +55,84 @@ program
   .option("-s, --server <url>", i18n.t("tui.cli.options.server", "AstrBot Dashboard URL"))
   .option("-u, --username <name>", i18n.t("tui.cli.login.options.username", "Dashboard username"))
   .option("--password-stdin", i18n.t("tui.cli.login.options.passwordStdin", "Read the Dashboard password from stdin"))
+  .option("--code <code>", i18n.t("tui.cli.login.options.code", "TOTP or recovery code"))
   .action(async (options: LoginCommandOptions) => {
-    const rootOptions = program.opts<RootOptions>();
-    const profile = await loadProfile();
-    const serverUrl = resolveServerUrl(
-      options.server || rootOptions.server || profile?.serverUrl,
-    );
-    const username =
-      options.username ||
-      (await input({
-        message: i18n.t("features.auth.username", "Username"),
-        default: profile?.username || "astrbot",
-      }));
-    const passwordValue = options.passwordStdin
-      ? await readPasswordFromStdin()
-      : await password({
-          message: i18n.t("features.auth.password", "Password"),
-          mask: "*",
-        });
-
+    let serverUrl = "";
+    let username = options.username || "";
     try {
-      const result = await loginSession({
-        serverUrl,
-        username,
-        password: passwordValue,
-      });
+      const rootOptions = program.opts<RootOptions>();
+      const actionI18n = createI18n(options.lang || rootOptions.lang);
+      const profile = await loadProfile();
+      serverUrl = resolveServerUrl(options.server || rootOptions.server, profile?.serverUrl);
+      const setupRequired = await isServerSetupRequired(serverUrl);
+      const profileUsername = profile?.serverUrl === serverUrl ? profile.username : undefined;
+      if (setupRequired) {
+        console.log(actionI18n.t(
+          "tui.cli.setup.firstAccount",
+          "This Dashboard has no account yet. The next step will create its first account.",
+        ));
+      }
+      if (!username) {
+        username = await input({
+          message: setupRequired
+            ? actionI18n.t("tui.cli.setup.username", "Create the first Dashboard username")
+            : actionI18n.t("features.auth.username", "Username"),
+          default: profileUsername || "astrbot",
+        });
+      }
+      const passwordValue = options.passwordStdin
+        ? await readPasswordFromStdin()
+        : await password({
+            message: setupRequired
+              ? actionI18n.t("tui.cli.setup.password", "Choose a Dashboard password")
+              : actionI18n.t("features.auth.password", "Password"),
+            mask: "*",
+          });
+      const confirmPassword = setupRequired
+        ? await password({
+            message: actionI18n.t("tui.cli.setup.confirmPassword", "Confirm the Dashboard password"),
+            mask: "*",
+          })
+        : undefined;
+      let code = options.code;
+      let result: Awaited<ReturnType<typeof loginSession>>;
+      try {
+        result = await loginSession({
+          serverUrl,
+          username,
+          password: passwordValue,
+          confirmPassword,
+          code,
+        });
+      } catch (error) {
+        if (!setupRequired && !code && isTotpRequiredError(error)) {
+          code = await password({
+            message: actionI18n.t("tui.cli.login.options.code", "TOTP or recovery code"),
+            mask: "*",
+          });
+          result = await loginSession({
+            serverUrl,
+            username,
+            password: passwordValue,
+            code,
+          });
+        } else {
+          throw error;
+        }
+      }
       console.log(
-        i18n.t("tui.cli.login.success", "Logged in as {username}. Token stored with {kind}.", {
+        actionI18n.t("tui.cli.login.success", "Logged in as {username}. Token stored with {kind}.", {
           username: result.username,
           kind: result.tokenStoreKind,
         }),
       );
     } catch (error) {
-      console.error(i18n.t("tui.cli.login.failed", "Login failed: {error}", {
+      const actionI18n = createI18n(options.lang || program.opts<RootOptions>().lang);
+      console.error(actionI18n.t("tui.cli.login.failed", "Login failed: {error}", {
         error: messageFromUnknown(error),
       }));
-      console.error(i18n.t("tui.cli.labels.server", "Server: {serverUrl}", { serverUrl }));
-      console.error(i18n.t("tui.cli.labels.username", "Username: {username}", { username }));
+      console.error(actionI18n.t("tui.cli.labels.server", "Server: {serverUrl}", { serverUrl }));
+      console.error(actionI18n.t("tui.cli.labels.username", "Username: {username}", { username }));
       process.exitCode = 1;
     }
   });
@@ -98,16 +143,17 @@ program
   .option("-s, --server <url>", i18n.t("tui.cli.options.server", "AstrBot Dashboard URL"))
   .action(async (options: RootOptions) => {
     const rootOptions = program.opts<RootOptions>();
+    const actionI18n = createI18n(options.lang || rootOptions.lang);
     try {
       const result = await logoutSession(options.server || rootOptions.server);
       console.log(
-        i18n.t("tui.cli.logout.success", "Logged out from {serverUrl}. Token removed from {kind}.", {
+        actionI18n.t("tui.cli.logout.success", "Logged out from {serverUrl}. Token removed from {kind}.", {
           serverUrl: result.serverUrl,
           kind: result.tokenStoreKind,
         }),
       );
     } catch (error) {
-      console.error(i18n.t("tui.cli.logout.failed", "Logout failed: {error}", {
+      console.error(actionI18n.t("tui.cli.logout.failed", "Logout failed: {error}", {
         error: messageFromUnknown(error),
       }));
       process.exitCode = 1;
@@ -120,21 +166,24 @@ program
   .option("-s, --server <url>", i18n.t("tui.cli.options.server", "AstrBot Dashboard URL"))
   .action(async (options: RootOptions) => {
     const rootOptions = program.opts<RootOptions>();
+    const actionI18n = createI18n(options.lang || rootOptions.lang);
     try {
       const { client, serverUrl, username, tokenStoreKind } =
         await getAuthenticatedClient(options.server || rootOptions.server);
       const version = await client.getVersion();
-      console.log(i18n.t("tui.cli.labels.server", "Server: {serverUrl}", { serverUrl }));
-      console.log(i18n.t("tui.cli.labels.user", "User: {username}", {
-        username: username || i18n.t("tui.common.unknown", "unknown"),
+      console.log(actionI18n.t("tui.cli.labels.server", "Server: {serverUrl}", { serverUrl }));
+      console.log(actionI18n.t("tui.cli.labels.user", "User: {username}", {
+        username: username || actionI18n.t("tui.common.unknown", "unknown"),
       }));
-      console.log(i18n.t("tui.cli.labels.tokenStore", "Token store: {kind}", { kind: tokenStoreKind }));
+      console.log(actionI18n.t("tui.cli.labels.tokenStore", "Token store: {kind}", { kind: tokenStoreKind }));
       console.log(`AstrBot: v${version.version}`);
       if (version.dashboard_version) {
-        console.log(`${i18n.t("core.navigation.dashboard", "Dashboard")}: ${version.dashboard_version}`);
+        console.log(`${actionI18n.t("core.navigation.dashboard", "Dashboard")}: ${version.dashboard_version}`);
       }
     } catch (error) {
-      console.error(messageFromUnknown(error));
+      console.error(actionI18n.t("tui.cli.status.failed", "Status check failed: {error}", {
+        error: messageFromUnknown(error),
+      }));
       process.exitCode = 1;
     }
   });
@@ -143,20 +192,39 @@ type Session = Awaited<ReturnType<typeof getAuthenticatedClient>>;
 
 async function startWorkbench(serverFlag?: string, localeFlag?: string): Promise<void> {
   let session: Session | null = null;
+  let sessionExpired = false;
+  const profile = await loadProfile();
+  const defaultServerUrl = resolveServerUrl(serverFlag, profile?.serverUrl);
   try {
     session = await getAuthenticatedClient(serverFlag);
-  } catch {
-    // No stored session for this server; fall through to the first-run setup screen.
+    try {
+      await session.client.getVersion();
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 401) {
+        session = null;
+        sessionExpired = true;
+      } else {
+        throw error;
+      }
+    }
+  } catch (error) {
+    // A missing token or an expired JWT falls through to the sign-in screen.
+    if (!(error instanceof NoStoredTokenError)) {
+      throw error;
+    }
   }
 
-  const profile = await loadProfile();
+  const defaultUsername = profile?.serverUrl === defaultServerUrl
+    ? profile.username || "astrbot"
+    : "astrbot";
   const workbenchI18n = createI18n(localeFlag);
   render(
     <Root
       i18n={workbenchI18n}
       initialSession={session}
-      defaultServerUrl={resolveServerUrl(serverFlag || profile?.serverUrl)}
-      defaultUsername={profile?.username || "astrbot"}
+      sessionExpired={sessionExpired}
+      defaultServerUrl={defaultServerUrl}
+      defaultUsername={defaultUsername}
       locale={localeFlag}
     />,
   );
@@ -165,12 +233,14 @@ async function startWorkbench(serverFlag?: string, localeFlag?: string): Promise
 function Root({
   i18n: rootI18n,
   initialSession,
+  sessionExpired,
   defaultServerUrl,
   defaultUsername,
   locale,
 }: {
   i18n: I18n;
   initialSession: Session | null;
+  sessionExpired: boolean;
   defaultServerUrl: string;
   defaultUsername: string;
   locale?: string;
@@ -181,11 +251,18 @@ function Root({
     return (
       <SetupView
         i18n={rootI18n}
+        sessionExpired={sessionExpired}
         defaultServerUrl={defaultServerUrl}
         defaultUsername={defaultUsername}
         onSubmit={async (values: SetupValues) => {
           const serverUrl = normalizeServerUrl(values.serverUrl);
-          await loginSession({ serverUrl, username: values.username, password: values.password });
+          await loginSession({
+            serverUrl,
+            username: values.username,
+            password: values.password,
+            confirmPassword: values.confirmPassword,
+            code: values.code,
+          });
           setSession(await getAuthenticatedClient(serverUrl));
         }}
       />
@@ -212,4 +289,9 @@ async function readPasswordFromStdin(): Promise<string> {
   return raw.replace(/\r?\n$/, "");
 }
 
-await program.parseAsync();
+try {
+  await program.parseAsync();
+} catch (error) {
+  console.error(messageFromUnknown(error));
+  process.exitCode = 1;
+}
