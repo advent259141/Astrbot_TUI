@@ -148,7 +148,9 @@ function accountFor(serverUrl: string): string {
 
 async function loadKeytar(): Promise<KeytarLike | null> {
   try {
-    const module = (await import("keytar")) as Partial<KeytarLike> & {
+    // Resolve at runtime so builds also work when this optional native addon is absent.
+    const optionalModule = "keytar";
+    const module = (await import(optionalModule)) as Partial<KeytarLike> & {
       default?: Partial<KeytarLike>;
     };
     if (isKeytarLike(module)) {
